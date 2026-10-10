@@ -94,7 +94,7 @@ function Index() {
       try {
         const d = await loadZone(z, wanted, force);
         ok++;
-        setEpg((p) => { const n = { ...p }; for (const k in d) n[k] ??= d[k]!; return n; });
+        setEpg((p) => { const n = { ...p }; for (const k in d) { const entry = d[k]; if (entry && (!n[k] || n[k]?.z === z)) n[k] = entry; } return n; });
       } catch { /* zone unreachable */ }
     }
     setEpgState(ok ? "idle" : "error");
