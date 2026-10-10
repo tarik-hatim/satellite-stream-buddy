@@ -400,7 +400,7 @@ function Logo({ name }: { name: string }) {
 }
 
 function ChannelCard({ c, g, now, day, range, t, lang, fav, onFav, onOpen }: {
-  c: Channel; g?: EpgChannel; now: number; day: number; range: readonly [number, number]; t: FullDict; lang: Lang; fav: boolean; onFav: () => void; onOpen: () => void;
+  c: Channel; g?: EpgChannel | undefined; now: number; day: number; range: readonly [number, number]; t: FullDict; lang: Lang; fav: boolean; onFav: () => void; onOpen: () => void;
 }) {
   const nn = g ? nowNext(g.p, now) : null;
   const firstOfDay = day !== 0 ? g?.p.find((p) => inRange(p, range)) : undefined;
@@ -479,7 +479,7 @@ function GridView({ channels, dayProgs, range, now, lang, onOpen }: {
 }
 
 function ChannelDetail({ c, g, progs, now, t, lang, fav, onFav, onClose, hasRem, toggleRem }: {
-  c: Channel; g?: EpgChannel; progs: Programme[]; now: number; t: FullDict; lang: Lang; fav: boolean; onFav: () => void; onClose: () => void;
+  c: Channel; g?: EpgChannel | undefined; progs: Programme[]; now: number; t: FullDict; lang: Lang; fav: boolean; onFav: () => void; onClose: () => void;
   hasRem: (k: string) => boolean; toggleRem: (r: Reminder) => void;
 }) {
   const [slot, setSlot] = useState<Slot>("all");
@@ -542,7 +542,7 @@ function ChannelDetail({ c, g, progs, now, t, lang, fav, onFav, onClose, hasRem,
           <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
             {(["all", "morning", "afternoon", "evening", "night"] as Slot[]).map((s) => (
               <button key={s} data-nav data-on={slot === s} onClick={() => setSlot(s)} className="chip">
-                {s === "all" ? t.allDay : `${t[s]} ${s !== "all" ? `(${String(SLOTS[s][0]).padStart(2, "0")}–${String(SLOTS[s][1]).padStart(2, "0")})` : ""}`}
+                {s === "all" ? t.allDay : `${t[s]} (${String(SLOTS[s][0]).padStart(2, "0")}–${String(SLOTS[s][1]).padStart(2, "0")})`}
               </button>
             ))}
           </div>
