@@ -1,7 +1,7 @@
 import { idbGet, idbSet } from "./storage";
 import type { Region } from "./region";
 
-export interface Programme { start: number; stop: number; title: string; desc?: string; cat?: string }
+export interface Programme { start: number; stop: number; title: string; desc?: string; cat?: string; img?: string }
 export interface EpgChannel { z: string; p: Programme[] }
 /** key = normalised channel name */
 export type EpgIndex = Record<string, EpgChannel>;
@@ -26,6 +26,17 @@ export const DEFAULT_ZONES: Record<Region, string[]> = {
 };
 const TTL = 6 * 3600_000;
 const DAY = 86_400_000;
+const CACHE_VERSION = 2;
+
+export function programmeImage(raw: string | undefined): string | undefined {
+  if (!raw) return undefined;
+  try {
+    const url = new URL(unesc(raw));
+    if (url.protocol !== "https:" && url.protocol !== "http:") return undefined;
+    if (url.protocol === "http:") url.protocol = "https:";
+    return url.href;
+  } catch { return undefined; }
+}
 
 export const normName = (s: string) =>
   s.toLowerCase().replace(/\b(hd|fhd|uhd|sd|4k|tv|\.[a-z]{2})\b/g, "").replace(/[^\p{L}\p{N}]+/gu, "");
@@ -58,10 +69,12 @@ export function parseXmltv(xml: string, zone: string, wanted?: Set<string>): Epg
     if (!title) continue;
     const desc = body.match(/<desc[^>]*>([^<]*)</)?.[1];
     const cat = body.match(/<category[^>]*>([^<]*)</)?.[1];
+    const img = programmeImage(body.match(/<icon\b[^>]*\bsrc=["']([^"']+)["']/i)?.[1]);
     (out[n] ??= { z: zone, p: [] }).p.push({
       start, stop, title: unesc(title),
       ...(desc ? { desc: unesc(desc).slice(0, 400) } : {}),
       ...(cat ? { cat: unesc(cat) } : {}),
+      ...(img ? { img } : {}),
     });
   }
   for (const k in out) out[k]!.p.sort((a, b) => a.start - b.start);
@@ -79,10 +92,10 @@ async function fetchZone(zone: string): Promise<string> {
 
 export async function loadZone(zone: string, wanted: Set<string>, force = false): Promise<EpgIndex> {
   const key = `epgz:${zone}`;
-  const cached = await idbGet<{ at: number; data: EpgIndex }>(key);
-  if (!force && cached && Date.now() - cached.at < TTL) return cached.data;
+  const cached = await idbGet<{ at: number; version?: number; data: EpgIndex }>(key);
+  if (!force && cached?.version === CACHE_VERSION && Date.now() - cached.at < TTL) return cached.data;
   const data = parseXmltv(await fetchZone(zone), zone, wanted);
-  await idbSet(key, { at: Date.now(), data });
+  await idbSet(key, { at: Date.now(), version: CACHE_VERSION, data });
   return data;
 }
 

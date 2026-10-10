@@ -135,3 +135,21 @@
     border-color: var(--color-primary);
   }
 }
+
+.app-shell .chip { min-height: 44px; padding: 0.4rem 0.7rem; border-radius: 8px; }
+.filter-group summary::-webkit-details-marker { display: none; }
+.filter-group[open] summary > svg { transform: rotate(180deg); }
+.app-shell[data-remote="true"] { max-width: 1440px; padding: 2rem 3rem; gap: 1rem; }
+.app-shell[data-remote="true"] [data-nav] { min-height: 48px; font-size: 1rem; }
+.app-shell[data-remote="true"] [data-nav]:focus-visible { outline-width: 4px; outline-offset: 4px; }
+.app-shell[data-remote="true"] .filter-overlay { place-items: center; padding: 2rem; }
+.app-shell[data-remote="true"] .filter-dialog { max-width: 760px; max-height: 82dvh; padding: 1.5rem; }
+.app-shell[data-remote="true"] .filter-group > div { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 639px) {
+  .filter-dialog { border-radius: 12px 12px 0 0; padding-bottom: max(1rem, env(safe-area-inset-bottom)); }
+  .app-shell[data-remote="true"] { padding: 1rem; }
+  .app-shell[data-remote="true"] .filter-group > div { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}
