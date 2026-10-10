@@ -1,19 +1,21 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import { SATELLITES, formatPosition } from "@/lib/satellites";
-import { CHANNEL_LANGS, DICTS, LANGS, LANG_NAMES, isRtl, type Lang } from "@/lib/i18n";
+import { CHANNEL_LANGS, DICTS, LANGS, LANG_NAMES, isRtl, type FullDict, type Lang } from "@/lib/i18n";
 import { filterChannels, importChmax, loadCatalog, type Channel } from "@/lib/catalog";
-import { cachedEpg, loadEpg, normName, nowNext, type EpgIndex } from "@/lib/epg";
+import { ZONES, cachedZones, dayRange, inRange, loadZone, normName, nowNext, type EpgChannel, type EpgIndex, type Programme } from "@/lib/epg";
+import { CATEGORY_ICON, CATEGORY_LABEL, categorize, type Category } from "@/lib/categories";
 import { useSettings } from "@/lib/settings";
+import { useFavorites, useReminders, reminderKey, type Reminder } from "@/lib/prefs";
 import { moveFocus } from "@/lib/dpad";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "PulseEPG — Satellite TV guide" },
-      { name: "description", content: "Browse 8,800+ channels across 13 satellites with live TV guide, in your language." },
+      { name: "description", content: "Live TV guide for 8,800+ channels across 13 satellites, with reminders and favorites, in your language." },
       { property: "og:title", content: "PulseEPG — Satellite TV guide" },
-      { property: "og:description", content: "Browse 8,800+ channels across 13 satellites with live TV guide." },
+      { property: "og:description", content: "Live TV guide for 8,800+ channels across 13 satellites, with reminders and favorites." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
@@ -21,36 +23,88 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
-const PAGE = 60;
-const fmtTime = (t: number, lang: Lang) =>
-  new Date(t).toLocaleTimeString(lang, { hour: "2-digit", minute: "2-digit" });
+type Tab = "live" | "grid" | "favorites" | "reminders";
+type Slot = "all" | "morning" | "afternoon" | "evening" | "night";
+const PAGE = 40;
+const SLOTS: Record<Exclude<Slot, "all">, [number, number]> = { morning: [5, 12], afternoon: [12, 18], evening: [18, 24], night: [0, 5] };
+
+const fmtT = (t: number, l: Lang) => new Date(t).toLocaleTimeString(l, { hour: "2-digit", minute: "2-digit" });
+const fmtDur = (ms: number, t: FullDict) => {
+  const m = Math.max(0, Math.round(ms / 60000));
+  return m >= 60 ? `${Math.floor(m / 60)}h${String(m % 60).padStart(2, "0")}` : `${m} ${t.min}`;
+};
+
+function useNow(ms = 30_000) {
+  const [n, setN] = useState(() => Date.now());
+  useEffect(() => { const i = setInterval(() => setN(Date.now()), ms); return () => clearInterval(i); }, [ms]);
+  return n;
+}
 
 function Index() {
   const { settings, update, reset } = useSettings();
+  const { favs, toggle: toggleFav } = useFavorites();
+  const [banner, setBanner] = useState<Reminder | null>(null);
+  const onFire = useCallback((r: Reminder) => setBanner(r), []);
+  const { reminders, toggle: toggleRem, has: hasRem } = useReminders(onFire);
+  const now = useNow();
+
   const [catalog, setCatalog] = useState<Channel[] | null>(null);
+  const [epg, setEpg] = useState<EpgIndex>({});
+  const [epgState, setEpgState] = useState<"idle" | "loading" | "error">("idle");
+  const [tab, setTab] = useState<Tab>("live");
   const [tv, setTv] = useState<boolean | null>(true);
   const [query, setQuery] = useState("");
+  const [cat, setCat] = useState<Category | null>(null);
+  const [sat, setSat] = useState<number | null>(null);
+  const [bouquet, setBouquet] = useState<string | null>(null);
+  const [zone, setZone] = useState<string | null>(null);
+  const [genre, setGenre] = useState<string | null>(null);
+  const [day, setDay] = useState(0);
+  const [onlyGuide, setOnlyGuide] = useState(true);
   const [limit, setLimit] = useState(PAGE);
   const [panel, setPanel] = useState<"settings" | "exit" | null>(null);
   const [selected, setSelected] = useState<Channel | null>(null);
-  const [epg, setEpg] = useState<EpgIndex | null>(null);
-  const [epgState, setEpgState] = useState<"idle" | "loading" | "error">("idle");
   const fileRef = useRef<HTMLInputElement>(null);
 
   const lang = settings?.lang ?? "en";
   const t = DICTS[lang];
+  const cl = CATEGORY_LABEL[lang]!;
 
   useEffect(() => { loadCatalog().then(setCatalog); }, []);
   useEffect(() => {
     document.documentElement.lang = lang;
     document.documentElement.dir = isRtl(lang) ? "rtl" : "ltr";
   }, [lang]);
-  useEffect(() => { if (settings) cachedEpg(settings.region).then((d) => d && setEpg(d)); }, [settings?.region]);
 
-  // D-pad + Back key handling
+  const zonesKey = settings?.zones.join(",");
+  const fetchGuide = useCallback(async (force = false) => {
+    if (!catalog || !settings) return;
+    setEpgState("loading");
+    const wanted = new Set(catalog.map((c) => normName(c.name)));
+    let ok = 0;
+    for (const z of settings.zones) {
+      try {
+        const d = await loadZone(z, wanted, force);
+        ok++;
+        setEpg((p) => { const n = { ...p }; for (const k in d) n[k] ??= d[k]!; return n; });
+      } catch { /* zone unreachable */ }
+    }
+    setEpgState(ok ? "idle" : "error");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [catalog, zonesKey]);
+
+  useEffect(() => {
+    if (!catalog || !settings) return;
+    setEpg({});
+    cachedZones(settings.zones).then((c) => { setEpg(c); void fetchGuide(); });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [catalog, zonesKey]);
+
+  // D-pad + Back
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" || e.key === "Backspace" && (e.target as HTMLElement).tagName !== "INPUT" || e.key === "GoBack" || e.keyCode === 10009 || e.keyCode === 461) {
+      const inInput = (e.target as HTMLElement).tagName === "INPUT";
+      if (e.key === "Escape" || (e.key === "Backspace" && !inInput) || e.key === "GoBack" || e.keyCode === 10009 || e.keyCode === 461) {
         e.preventDefault();
         if (selected) setSelected(null);
         else setPanel((p) => (p ? null : "exit"));
@@ -61,8 +115,6 @@ function Index() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [selected]);
-
-  // Android/mobile hardware back → exit modal
   useEffect(() => {
     history.pushState({ pulse: 1 }, "");
     const onPop = () => { history.pushState({ pulse: 1 }, ""); setPanel("exit"); };
@@ -70,128 +122,188 @@ function Index() {
     return () => window.removeEventListener("popstate", onPop);
   }, []);
 
-  const filtered = useMemo(
-    () => catalog && settings
-      ? filterChannels(catalog, { satellites: settings.satellites, tv, lang: settings.channelLang, freeOnly: settings.freeOnly, query })
-      : [],
-    [catalog, settings, tv, query],
-  );
+  const range = useMemo(() => dayRange(day), [day, Math.floor(now / 3600_000)]);
+  const guideOf = useCallback((c: Channel): EpgChannel | undefined => epg[normName(c.name)], [epg]);
+
+  // Base list: satellites enabled in settings + search + TV/radio + language + free
+  const base = useMemo(() => {
+    if (!catalog || !settings) return [];
+    let l = filterChannels(catalog, { satellites: settings.satellites, tv, lang: settings.channelLang, freeOnly: settings.freeOnly, query });
+    if (tab === "favorites") l = l.filter((c) => favs.includes(c.id));
+    else if (onlyGuide) l = l.filter((c) => guideOf(c));
+    return l;
+  }, [catalog, settings, tv, query, tab, favs, onlyGuide, guideOf]);
+
+  const dayProgs = useCallback((c: Channel) => guideOf(c)?.p.filter((p) => inRange(p, range)) ?? [], [guideOf, range]);
+  const mainCat = useCallback((c: Channel): Category => {
+    const p = guideOf(c)?.p;
+    const cur = p && nowNext(p, now).now;
+    return categorize(cur?.cat ?? p?.[0]?.cat ?? c.name);
+  }, [guideOf, now]);
+
+  const passes = (c: Channel, skip: string) =>
+    (skip === "cat" || !cat || mainCat(c) === cat) &&
+    (skip === "sat" || sat === null || (c.satMask & (1 << sat)) !== 0) &&
+    (skip === "bouquet" || !bouquet || c.provider === bouquet) &&
+    (skip === "zone" || !zone || guideOf(c)?.z === zone) &&
+    (skip === "genre" || !genre || dayProgs(c).some((p) => p.cat === genre));
+
+  const filtered = useMemo(() => base.filter((c) => passes(c, "")),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [base, cat, sat, bouquet, zone, genre, dayProgs, mainCat]);
   useEffect(() => setLimit(PAGE), [filtered]);
+
+  const counts = useMemo(() => {
+    const count = <K extends string | number>(skip: string, key: (c: Channel) => K[]) => {
+      const m = new Map<K, number>();
+      for (const c of base) if (passes(c, skip)) for (const k of key(c)) m.set(k, (m.get(k) ?? 0) + 1);
+      return [...m.entries()].sort((a, b) => b[1] - a[1]);
+    };
+    return {
+      cat: count("cat", (c) => [mainCat(c)]),
+      sat: count("sat", (c) => SATELLITES.filter((s) => c.satMask & (1 << s.index)).map((s) => s.index)),
+      bouquet: count("bouquet", (c) => (c.provider ? [c.provider] : [])).slice(0, 15),
+      zone: count("zone", (c) => { const z = guideOf(c)?.z; return z ? [z] : []; }),
+      genre: count("genre", (c) => [...new Set(dayProgs(c).map((p) => p.cat).filter((x): x is string => !!x))]).slice(0, 15),
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [base, cat, sat, bouquet, zone, genre, dayProgs, mainCat]);
+
+  const activeProgs = useMemo(() => filtered.reduce((n, c) => n + dayProgs(c).length, 0), [filtered, dayProgs]);
 
   if (!settings) return <div className="min-h-screen" />;
 
   const toggleSat = (i: number) =>
     update((s) => ({ satellites: s.satellites.includes(i) ? s.satellites.filter((x) => x !== i) : [...s.satellites, i].sort((a, b) => a - b) }));
-
-  const fetchGuide = async () => {
-    if (!catalog) return;
-    setEpgState("loading");
-    try {
-      const wanted = new Set(filtered.map((c) => normName(c.name)));
-      setEpg(await loadEpg(settings.region, wanted, true));
-      setEpgState("idle");
-    } catch { setEpgState("error"); }
-  };
-
+  const toggleZone = (z: string) =>
+    update((s) => ({ zones: s.zones.includes(z) ? s.zones.filter((x) => x !== z) : [...s.zones, z] }));
   const onImport = async (e: ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (f) setCatalog(await importChmax(await f.text()));
   };
 
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const off = -new Date().getTimezoneOffset() / 60;
+  const tabs: [Tab, string, string][] = [
+    ["live", "●", t.liveNow], ["grid", "▦", t.grid], ["favorites", "♡", t.favorites], ["reminders", "🔔", `${t.remindMe.split(" ")[0]} ${reminders.length || ""}`],
+  ];
+  const sats = SATELLITES.filter((s) => settings.satellites.includes(s.index));
+
   return (
-    <div className="mx-auto flex min-h-screen max-w-6xl flex-col gap-4 px-4 py-5 md:px-8">
-      <header className="flex items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight md:text-3xl">
-            Pulse<span className="text-primary">EPG</span>
-          </h1>
-          <p className="text-xs text-muted-foreground">{t.tagline} · {t[`region_${settings.region}`]}</p>
+    <div className="mx-auto flex min-h-screen max-w-6xl flex-col gap-4 px-3 py-4 md:px-8">
+      {banner && (
+        <div role="alert" className="fixed inset-x-3 top-3 z-[60] mx-auto flex max-w-xl items-center gap-3 rounded-2xl border border-primary bg-card p-4 shadow-2xl">
+          <span className="text-2xl">🔔</span>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs text-primary">{banner.start > Date.now() ? `${t.startingNow} · ${fmtT(banner.start, lang)}` : t.live}</p>
+            <p className="truncate font-semibold">{banner.channel} — {banner.title}</p>
+          </div>
+          <button data-nav autoFocus onClick={() => setBanner(null)} className="chip">{t.close}</button>
         </div>
-        <button data-nav onClick={() => setPanel("settings")} className="chip" aria-label={t.settings}>
-          ⚙ <span className="hidden sm:inline">{t.settings}</span>
-        </button>
+      )}
+
+      <header className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <span className="grid size-11 place-items-center rounded-xl bg-primary text-xl font-bold text-primary-foreground">P</span>
+          <div>
+            <h1 className="text-xl font-bold tracking-tight md:text-2xl">Pulse<span className="text-primary">EPG</span></h1>
+            <p className="text-xs text-muted-foreground">{t.tagline} · {t[`region_${settings.region}`]}</p>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <button data-nav onClick={() => fetchGuide(true)} disabled={epgState === "loading"} className="chip" aria-label={t.refreshEpg}>
+            <span className={epgState === "loading" ? "animate-spin" : ""}>⟳</span>
+          </button>
+          <button data-nav onClick={() => setPanel("settings")} className="chip" aria-label={t.settings}>⚙</button>
+        </div>
       </header>
 
-      <input
-        data-nav value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t.search}
-        className="w-full rounded-xl border border-input bg-card px-4 py-3 text-base outline-none focus:border-ring"
-      />
-
-      <section aria-label={t.satellites} className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 md:mx-0 md:flex-wrap md:px-0">
-        {SATELLITES.map((s) => (
-          <button key={s.index} data-nav data-on={settings.satellites.includes(s.index)} onClick={() => toggleSat(s.index)} className="chip">
-            <span className="font-semibold">{formatPosition(s.position)}</span>
-            <span className="opacity-80">{s.name}</span>
+      <nav className="-mx-3 flex gap-2 overflow-x-auto px-3 pb-1">
+        {tabs.map(([k, icon, label]) => (
+          <button key={k} data-nav data-on={tab === k} onClick={() => setTab(k)} className="chip text-base">
+            <span>{icon}</span>{label}
           </button>
         ))}
-      </section>
+      </nav>
 
-      <div className="flex flex-wrap items-center gap-2">
-        {([[true, t.tv], [false, t.radio], [null, t.all]] as const).map(([v, label]) => (
-          <button key={String(v)} data-nav data-on={tv === v} onClick={() => setTv(v)} className="chip">{label}</button>
-        ))}
-        <span className="ms-auto text-sm text-muted-foreground">
-          {catalog ? `${filtered.length.toLocaleString(lang)} ${t.channels}` : t.loading}
-        </span>
-        <button data-nav onClick={fetchGuide} disabled={epgState === "loading"} className="chip">
-          {epgState === "loading" ? t.epgLoading : t.loadEpg}
-        </button>
-      </div>
-      {epgState === "error" && <p className="text-sm text-destructive">{t.epgError}</p>}
+      {tab === "reminders" ? (
+        <RemindersView reminders={reminders} t={t} lang={lang} onRemove={toggleRem} now={now} />
+      ) : (
+        <>
+          <section className="flex flex-col gap-3 rounded-2xl border border-border bg-card/60 p-3">
+            <input data-nav value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t.search}
+              className="w-full rounded-xl border border-input bg-background px-4 py-3 text-base outline-none focus:border-ring" />
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <span className="flex items-center gap-2 rounded-xl bg-background px-3 py-2 font-mono">
+                <span className="size-2 animate-pulse rounded-full bg-destructive" />
+                {new Date(now).toLocaleDateString(lang, { weekday: "short", day: "numeric", month: "short" })}
+                <b>{fmtT(now, lang)}</b>
+                <span className="rounded-md border border-accent/60 px-1.5 text-xs text-accent">UTC{off >= 0 ? "+" : ""}{off} {tz.split("/").pop()?.replace("_", " ")}</span>
+              </span>
+              {([[true, t.tv], [false, t.radio], [null, t.all]] as const).map(([v, label]) => (
+                <button key={String(v)} data-nav data-on={tv === v} onClick={() => setTv(v)} className="chip">{label}</button>
+              ))}
+            </div>
 
-      {catalog && filtered.length === 0 && <p className="py-16 text-center text-muted-foreground">{t.noResults}</p>}
+            <FilterRow label={`🎞 ${t.category}`} all={t.all} total={base.length} value={cat} onChange={setCat}
+              items={counts.cat.map(([k, n]) => [k, `${CATEGORY_ICON[k]} ${cl[k]}`, n])} />
+            <FilterRow label={`🛰 ${t.sat}`} all={t.all} total={base.length} value={sat} onChange={setSat}
+              items={counts.sat.map(([k, n]) => [k, `${SATELLITES[k]!.name.split(" ")[0]} ${formatPosition(SATELLITES[k]!.position)}`, n])} />
+            <FilterRow label={t.bouquet} all={t.all} total={base.length} value={bouquet} onChange={setBouquet}
+              items={counts.bouquet.map(([k, n]) => [k, k, n])} />
+            <FilterRow label={`🌐 ${t.zone}`} all={`🌍 ${t.all}`} total={base.length} value={zone} onChange={setZone}
+              items={counts.zone.map(([k, n]) => [k, `${ZONES[k]?.flag ?? ""} ${ZONES[k]?.label ?? k}`, n])} />
+            <FilterRow label={`✦ ${t.genre}`} all={t.allGenres} total={base.length} value={genre} onChange={setGenre}
+              items={counts.genre.map(([k, n]) => [k, k, n])} />
 
-      <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-        {filtered.slice(0, limit).map((c) => {
-          const nn = epg ? nowNext(epg[normName(c.name)]) : null;
-          return (
-            <li key={c.id}>
-              <button data-nav onClick={() => setSelected(c)}
-                className="flex w-full items-center gap-3 rounded-xl border border-border bg-card p-3 text-start transition hover:border-primary/60">
-                <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-secondary text-sm font-bold text-primary">
-                  {c.name.slice(0, 2).toUpperCase()}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate font-semibold">{c.name}</span>
-                  <span className="block truncate text-xs text-muted-foreground">
-                    {nn?.now ? `${t.now}: ${nn.now.title}` : c.provider || "—"}
-                  </span>
-                </span>
-                <span className={`rounded-md px-2 py-0.5 text-[10px] font-semibold ${c.ca ? "bg-muted text-muted-foreground" : "bg-accent text-accent-foreground"}`}>
-                  {c.ca ? t.encrypted : t.fta}
-                </span>
-              </button>
-            </li>
-          );
-        })}
-      </ul>
-      {filtered.length > limit && (
-        <button data-nav onClick={() => setLimit((l) => l + PAGE)} className="chip mx-auto">{t.showMore}</button>
+            <div className="flex items-center gap-2 overflow-x-auto pb-1">
+              <span className="shrink-0 text-xs font-semibold uppercase text-muted-foreground">📅 7-day EPG</span>
+              {[-1, 0, 1, 2, 3, 4, 5, 6].map((d) => (
+                <button key={d} data-nav data-on={day === d} onClick={() => setDay(d)} className="chip">
+                  {d === -1 ? t.catchup : d === 0 ? `${t.today} (24h)` : new Date(dayRange(d)[0]).toLocaleDateString(lang, { weekday: "short", day: "numeric" })}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+              <span><b className="text-foreground">{filtered.length.toLocaleString(lang)}</b> {t.displayedOf} {base.length.toLocaleString(lang)}</span>
+              <span>•</span>
+              <span>{activeProgs.toLocaleString(lang)} {t.activeProgs}</span>
+              {tab !== "favorites" && (
+                <button data-nav data-on={!onlyGuide} onClick={() => setOnlyGuide((v) => !v)} className="chip ms-auto text-xs">
+                  {t.all} {t.channels}
+                </button>
+              )}
+            </div>
+            {epgState === "loading" && <p className="text-sm text-accent">{t.epgLoading}</p>}
+            {epgState === "error" && <p className="text-sm text-destructive">{t.epgError}</p>}
+          </section>
+
+          {!catalog && <p className="py-10 text-center text-muted-foreground">{t.loading}</p>}
+          {catalog && filtered.length === 0 && (
+            <p className="py-16 text-center text-muted-foreground">{tab === "favorites" ? t.noFavorites : epgState === "loading" ? t.epgLoading : t.noResults}</p>
+          )}
+
+          {tab === "grid" ? (
+            <GridView channels={filtered.slice(0, limit)} dayProgs={dayProgs} range={range} now={now} lang={lang} onOpen={setSelected} />
+          ) : (
+            <ul className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              {filtered.slice(0, limit).map((c) => (
+                <ChannelCard key={c.id} c={c} g={guideOf(c)} now={now} day={day} range={range} t={t} lang={lang}
+                  fav={favs.includes(c.id)} onFav={() => toggleFav(c.id)} onOpen={() => setSelected(c)} />
+              ))}
+            </ul>
+          )}
+          {filtered.length > limit && (
+            <button data-nav onClick={() => setLimit((l) => l + PAGE)} className="chip mx-auto">{t.showMore}</button>
+          )}
+        </>
       )}
 
       {selected && (
-        <Modal onClose={() => setSelected(null)}>
-          <h2 className="text-xl font-bold">{selected.name}</h2>
-          <p className="text-sm text-muted-foreground">{selected.provider}</p>
-          <p className="mt-2 text-sm">
-            {t.frequency}: {selected.freq} {selected.pol} {selected.sr} ·{" "}
-            {SATELLITES.filter((s) => selected.satMask & (1 << s.index)).map((s) => formatPosition(s.position)).join(", ")}
-          </p>
-          {selected.langs.length > 0 && <p className="mt-1 text-xs uppercase text-muted-foreground">{selected.langs.join(" · ")}</p>}
-          <div className="mt-4 space-y-2">
-            {(() => {
-              const nn = epg ? nowNext(epg[normName(selected.name)]) : null;
-              if (!nn?.now && !nn?.next) return <p className="text-sm text-muted-foreground">{t.noEpg}</p>;
-              return [[t.now, nn.now], [t.next, nn.next]].map(([label, p]) => p && typeof p === "object" && (
-                <div key={label as string} className="rounded-lg bg-secondary p-3">
-                  <span className="text-xs text-primary">{label as string} · {fmtTime(p.start, lang)}–{fmtTime(p.stop, lang)}</span>
-                  <p className="font-semibold">{p.title}</p>
-                </div>
-              ));
-            })()}
-          </div>
-          <button data-nav autoFocus onClick={() => setSelected(null)} className="chip mt-4">{t.close}</button>
-        </Modal>
+        <ChannelDetail c={selected} g={guideOf(selected)} progs={dayProgs(selected)} now={now} t={t} lang={lang}
+          fav={favs.includes(selected.id)} onFav={() => toggleFav(selected.id)} onClose={() => setSelected(null)}
+          hasRem={hasRem} toggleRem={toggleRem} />
       )}
 
       {panel === "settings" && (
@@ -217,6 +329,14 @@ function Index() {
             ))}
           </div>
 
+          <h3 className="mt-5 font-semibold">{t.epgZones}</h3>
+          <p className="text-xs text-muted-foreground">{t.zonesHint}</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {Object.entries(ZONES).map(([k, z]) => (
+              <button key={k} data-nav data-on={settings.zones.includes(k)} onClick={() => toggleZone(k)} className="chip">{z.flag} {z.label}</button>
+            ))}
+          </div>
+
           <h3 className="mt-5 font-semibold">{t.channelLang}</h3>
           <div className="mt-2 flex flex-wrap gap-2">
             <button data-nav data-on={settings.channelLang === null} onClick={() => update({ channelLang: null })} className="chip">{t.anyLang}</button>
@@ -232,6 +352,7 @@ function Index() {
             <button data-nav onClick={reset} className="chip">{t.resetAuto}</button>
             <button data-nav onClick={() => setPanel(null)} className="chip" data-on>{t.close}</button>
           </div>
+          <p className="mt-4 text-xs text-muted-foreground">{t.satellites}: {sats.map((s) => formatPosition(s.position)).join(" · ")}</p>
         </Modal>
       )}
 
@@ -249,11 +370,251 @@ function Index() {
   );
 }
 
-function Modal({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
+function FilterRow<K extends string | number>({ label, all, total, value, onChange, items }: {
+  label: string; all: string; total: number; value: K | null; onChange: (v: K | null) => void; items: [K, string, number][];
+}) {
+  if (items.length === 0) return null;
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-background/80 p-4 backdrop-blur-sm" onClick={onClose}>
+    <div className="flex items-center gap-2 overflow-x-auto border-t border-border/60 pt-3 pb-1">
+      <span className="shrink-0 text-xs font-semibold uppercase text-muted-foreground">{label}</span>
+      <button data-nav data-on={value === null} onClick={() => onChange(null)} className="chip">
+        {all} <Count n={total} />
+      </button>
+      {items.map(([k, l, n]) => (
+        <button key={String(k)} data-nav data-on={value === k} onClick={() => onChange(value === k ? null : k)} className="chip">
+          {l} <Count n={n} />
+        </button>
+      ))}
+    </div>
+  );
+}
+const Count = ({ n }: { n: number }) => <span className="rounded-full bg-background/70 px-2 text-xs font-semibold text-foreground">{n}</span>;
+
+function Progress({ p, now }: { p: Programme; now: number }) {
+  const pct = Math.min(100, Math.max(0, ((now - p.start) / (p.stop - p.start)) * 100));
+  return <div className="h-1.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-gradient-to-r from-primary to-accent" style={{ width: `${pct}%` }} /></div>;
+}
+
+function Logo({ name }: { name: string }) {
+  return <span className="grid size-12 shrink-0 place-items-center rounded-xl bg-secondary text-sm font-bold text-primary">{name.replace(/[^\p{L}\p{N}]/gu, "").slice(0, 3).toUpperCase()}</span>;
+}
+
+function ChannelCard({ c, g, now, day, range, t, lang, fav, onFav, onOpen }: {
+  c: Channel; g?: EpgChannel | undefined; now: number; day: number; range: readonly [number, number]; t: FullDict; lang: Lang; fav: boolean; onFav: () => void; onOpen: () => void;
+}) {
+  const nn = g ? nowNext(g.p, now) : null;
+  const firstOfDay = day !== 0 ? g?.p.find((p) => inRange(p, range)) : undefined;
+  const shown = day === 0 ? nn?.now ?? nn?.next : firstOfDay;
+  const live = shown && shown.start <= now && shown.stop > now;
+  const sats = SATELLITES.filter((s) => c.satMask & (1 << s.index));
+  return (
+    <li className="rounded-2xl border border-border bg-card p-3">
+      <div className="flex items-start gap-3">
+        <Logo name={c.name} />
+        <button data-nav onClick={onOpen} className="min-w-0 flex-1 text-start">
+          <span className="block truncate text-lg font-semibold">{c.name}</span>
+          <span className="mt-1 flex flex-wrap gap-1 text-[11px]">
+            {sats.slice(0, 2).map((s) => <span key={s.index} className="rounded-md border border-accent/50 px-1.5 py-0.5 uppercase text-accent">{s.name.split(" ")[0]} {formatPosition(s.position)}</span>)}
+            {c.provider && <span className="rounded-md border border-primary/50 px-1.5 py-0.5 text-primary">{c.provider}</span>}
+            {c.langs.length > 0 && <span className="rounded-md border border-border px-1.5 py-0.5 uppercase text-muted-foreground">🔊 {c.langs.slice(0, 3).join(" + ")}</span>}
+            <span className={`rounded-md px-1.5 py-0.5 ${c.ca ? "bg-muted text-muted-foreground" : "bg-accent text-accent-foreground"}`}>{c.ca ? t.encrypted : t.fta}</span>
+          </span>
+        </button>
+        <button data-nav onClick={onFav} aria-label={t.favorites} className="chip text-lg" data-on={fav}>{fav ? "♥" : "♡"}</button>
+      </div>
+      {shown && (
+        <button data-nav onClick={onOpen} className="mt-3 block w-full space-y-1.5 text-start">
+          <span className="flex items-center gap-2 text-sm">
+            {live ? <span className="rounded-md bg-destructive px-2 py-0.5 text-xs font-bold text-destructive-foreground">● {t.live}</span>
+              : <span className="rounded-md bg-secondary px-2 py-0.5 text-xs">{t.upcoming}</span>}
+            <span className="font-mono">{fmtT(shown.start, lang)} – {fmtT(shown.stop, lang)}</span>
+            {live && <span className="ms-auto text-xs text-muted-foreground">{fmtDur(shown.stop - now, t)} {t.left}</span>}
+          </span>
+          <span className="block truncate font-semibold">{shown.title}</span>
+          {shown.desc && <span className="line-clamp-1 block text-sm text-muted-foreground">{shown.desc}</span>}
+          {live && <Progress p={shown} now={now} />}
+          {day === 0 && nn?.next && live && <span className="block truncate text-xs text-muted-foreground">{t.next}: {fmtT(nn.next.start, lang)} {nn.next.title}</span>}
+        </button>
+      )}
+    </li>
+  );
+}
+
+function GridView({ channels, dayProgs, range, now, lang, onOpen }: {
+  channels: Channel[]; dayProgs: (c: Channel) => Programme[]; range: readonly [number, number]; now: number; lang: Lang; onOpen: (c: Channel) => void;
+}) {
+  const PX = 4; // px per minute
+  const ref = useRef<HTMLDivElement>(null);
+  const width = 24 * 60 * PX;
+  const x = (ts: number) => ((Math.max(range[0], Math.min(range[1], ts)) - range[0]) / 60000) * PX;
+  useEffect(() => { if (ref.current && now > range[0] && now < range[1]) ref.current.scrollLeft = Math.abs(x(now) - 120) * (document.dir === "rtl" ? -1 : 1); }, [range[0]]);
+  return (
+    <div ref={ref} dir="ltr" className="overflow-x-auto rounded-2xl border border-border bg-card">
+      <div style={{ width: width + 140 }} className="relative">
+        <div className="sticky top-0 flex h-8 border-b border-border ps-[140px] text-xs text-muted-foreground">
+          {Array.from({ length: 24 }, (_, h) => <span key={h} style={{ width: 60 * PX }} className="border-s border-border/60 ps-1">{fmtT(range[0] + h * 3600_000, lang)}</span>)}
+        </div>
+        {now > range[0] && now < range[1] && <div className="absolute top-0 bottom-0 z-10 w-0.5 bg-destructive" style={{ left: 140 + x(now) }} />}
+        {channels.map((c) => (
+          <div key={c.id} className="flex h-14 border-b border-border/60">
+            <button data-nav onClick={() => onOpen(c)} className="sticky left-0 z-20 w-[140px] shrink-0 truncate border-e border-border bg-card px-2 text-start text-sm font-semibold">{c.name}</button>
+            <div className="relative flex-1">
+              {dayProgs(c).map((p) => {
+                const live = p.start <= now && p.stop > now;
+                return (
+                  <button key={p.start} data-nav onClick={() => onOpen(c)} title={p.title}
+                    style={{ left: x(p.start), width: Math.max(8, x(p.stop) - x(p.start) - 2) }}
+                    className={`absolute top-1 bottom-1 overflow-hidden rounded-md px-2 text-start text-xs ${live ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground"}`}>
+                    <span className="block truncate font-semibold">{p.title}</span>
+                    <span className="block truncate opacity-75">{fmtT(p.start, lang)}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ChannelDetail({ c, g, progs, now, t, lang, fav, onFav, onClose, hasRem, toggleRem }: {
+  c: Channel; g?: EpgChannel | undefined; progs: Programme[]; now: number; t: FullDict; lang: Lang; fav: boolean; onFav: () => void; onClose: () => void;
+  hasRem: (k: string) => boolean; toggleRem: (r: Reminder) => void;
+}) {
+  const [slot, setSlot] = useState<Slot>("all");
+  const nn = g ? nowNext(g.p, now) : null;
+  const focus = nn?.now ?? nn?.next;
+  const sats = SATELLITES.filter((s) => c.satMask & (1 << s.index));
+  const list = slot === "all" ? progs : progs.filter((p) => {
+    const h = new Date(p.start).getHours(); const [a, b] = SLOTS[slot]; return h >= a && h < b;
+  });
+  const rem = (p: Programme) => ({ key: reminderKey(c.name, p.start), channel: c.name, title: p.title, start: p.start });
+  const cl = CATEGORY_LABEL[lang]!;
+  return (
+    <Modal onClose={onClose} wide>
+      <div className="flex items-start gap-3">
+        <Logo name={c.name} />
+        <div className="min-w-0 flex-1">
+          <h2 className="text-xl font-bold">{c.name}</h2>
+          <div className="mt-1 flex flex-wrap gap-1 text-xs">
+            {sats.map((s) => <span key={s.index} className="rounded-md border border-accent/50 px-1.5 py-0.5 uppercase text-accent">{s.name} {formatPosition(s.position)}</span>)}
+            {c.provider && <span className="rounded-md border border-primary/50 px-1.5 py-0.5 text-primary">{c.provider}</span>}
+          </div>
+        </div>
+        <button data-nav onClick={onFav} data-on={fav} className="chip text-lg">{fav ? "♥" : "♡"}</button>
+        <button data-nav autoFocus onClick={onClose} className="chip text-lg" aria-label={t.close}>✕</button>
+      </div>
+
+      <p className="mt-3 text-xs text-muted-foreground">
+        {t.frequency}: {c.freq} {c.pol} {c.sr}{c.langs.length > 0 && ` · ${t.audio}: ${c.langs.join(" + ").toUpperCase()}`}{g && ` · ${ZONES[g.z]?.flag ?? ""} ${ZONES[g.z]?.label ?? g.z}`}
+      </p>
+
+      {focus ? (
+        <div className="mt-4 space-y-3 rounded-2xl border border-border bg-background p-4">
+          {focus.start <= now ? (
+            <span className="inline-block rounded-lg bg-destructive px-3 py-1 text-sm font-bold text-destructive-foreground">
+              ● {t.live} · {fmtT(focus.start, lang)} → {fmtT(focus.stop, lang)} ({fmtDur(focus.stop - now, t)} {t.left})
+            </span>
+          ) : (
+            <span className="inline-block rounded-lg border border-accent px-3 py-1 text-sm">🕒 {fmtT(focus.start, lang)} → {fmtT(focus.stop, lang)} ({fmtDur(focus.stop - focus.start, t)})</span>
+          )}
+          {focus.start <= now && <Progress p={focus} now={now} />}
+          <h3 className="text-2xl font-bold">{focus.title}</h3>
+          {focus.cat && <p className="text-sm"><span className="text-muted-foreground">{t.genre}: </span><b>{focus.cat}</b> · {CATEGORY_ICON[categorize(focus.cat)]} {cl[categorize(focus.cat)]}</p>}
+          {focus.start > now && (
+            <button data-nav data-on={hasRem(rem(focus).key)} onClick={() => toggleRem(rem(focus))} className="chip">
+              🔔 {hasRem(rem(focus).key) ? t.reminderSet : t.remindMe}
+            </button>
+          )}
+          {focus.desc && (
+            <div className="border-t border-border pt-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t.synopsis}</p>
+              <p className="mt-1 text-sm leading-relaxed">{focus.desc}</p>
+            </div>
+          )}
+        </div>
+      ) : <p className="mt-4 text-sm text-muted-foreground">{t.noEpg}</p>}
+
+      {progs.length > 0 && (
+        <>
+          <h3 className="mt-5 font-semibold">{t.schedule}</h3>
+          <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
+            {(["all", "morning", "afternoon", "evening", "night"] as Slot[]).map((s) => (
+              <button key={s} data-nav data-on={slot === s} onClick={() => setSlot(s)} className="chip">
+                {s === "all" ? t.allDay : `${t[s]} (${String(SLOTS[s][0]).padStart(2, "0")}–${String(SLOTS[s][1]).padStart(2, "0")})`}
+              </button>
+            ))}
+          </div>
+          <ul className="mt-3 space-y-2">
+            {list.map((p) => {
+              const live = p.start <= now && p.stop > now, past = p.stop <= now, r = rem(p), on = hasRem(r.key);
+              return (
+                <li key={p.start} className={`flex gap-3 rounded-xl border p-3 ${live ? "border-primary bg-primary/10" : on ? "border-accent" : "border-border"} ${past ? "opacity-55" : ""}`}>
+                  <span className="w-14 shrink-0 font-mono text-sm">{fmtT(p.start, lang)}<br /><span className="text-muted-foreground">→ {fmtT(p.stop, lang)}</span></span>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold">{p.title}</p>
+                    {p.cat && <span className="mt-1 inline-block rounded-md border border-accent/50 px-1.5 py-0.5 text-xs text-accent">{p.cat}</span>}
+                    {on && <span className="ms-1 mt-1 inline-block rounded-md bg-accent px-1.5 py-0.5 text-xs font-bold text-accent-foreground">🔔 {t.reminderSet}</span>}
+                    {p.desc && <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{p.desc}</p>}
+                  </div>
+                  <div className="flex shrink-0 flex-col items-end gap-2">
+                    <span className="font-mono text-xs text-muted-foreground">{fmtDur(p.stop - p.start, t)}</span>
+                    {!past && !live && (
+                      <button data-nav data-on={on} onClick={() => toggleRem(r)} aria-label={t.remindMe} className="chip">🔔</button>
+                    )}
+                    {live && <span className="rounded-md bg-destructive px-1.5 text-xs font-bold text-destructive-foreground">{t.live}</span>}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </>
+      )}
+    </Modal>
+  );
+}
+
+function RemindersView({ reminders, t, lang, onRemove, now }: { reminders: Reminder[]; t: FullDict; lang: Lang; onRemove: (r: Reminder) => void; now: number }) {
+  const sorted = [...reminders].sort((a, b) => a.start - b.start);
+  return (
+    <section className="space-y-3">
+      <div className="rounded-2xl border border-border bg-card p-4">
+        <h2 className="text-lg font-bold">🔔 {t.remindMe} · {reminders.length}</h2>
+        <p className="mt-1 text-sm text-muted-foreground">5 {t.min} · {t.startingNow}</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button data-nav onClick={() => {
+            if (typeof Notification !== "undefined") {
+              if (Notification.permission === "granted") new Notification("PulseEPG", { body: t.reminderSet });
+              else void Notification.requestPermission();
+            }
+          }} className="chip" data-on>🔔 Test</button>
+          {reminders.length > 0 && <button data-nav onClick={() => reminders.forEach(onRemove)} className="chip">🗑 {t.all}</button>}
+        </div>
+      </div>
+      {sorted.length === 0 && <p className="py-10 text-center text-muted-foreground">—</p>}
+      {sorted.map((r) => (
+        <div key={r.key} className="flex items-center gap-3 rounded-2xl border border-accent/60 bg-card p-3">
+          <Logo name={r.channel} />
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold">{r.channel}</p>
+            <p className="truncate text-sm">{r.title}</p>
+            <p className="font-mono text-xs text-muted-foreground">
+              {new Date(r.start).toLocaleDateString(lang, { weekday: "short", day: "numeric", month: "short" })} · {fmtT(r.start, lang)} · {fmtDur(r.start - now, t)}
+            </p>
+          </div>
+          <button data-nav onClick={() => onRemove(r)} className="chip" aria-label={t.close}>✕</button>
+        </div>
+      ))}
+    </section>
+  );
+}
+
+function Modal({ children, onClose, wide }: { children: ReactNode; onClose: () => void; wide?: boolean }) {
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-background/80 p-3 backdrop-blur-sm" onClick={onClose}>
       <div data-nav-scope role="dialog" aria-modal onClick={(e) => e.stopPropagation()}
-        className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl border border-border bg-card p-5 shadow-2xl">
+        className={`max-h-[92vh] w-full overflow-y-auto rounded-2xl border border-border bg-card p-4 shadow-2xl ${wide ? "max-w-2xl" : "max-w-xl"}`}>
         {children}
       </div>
     </div>

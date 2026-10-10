@@ -29,7 +29,7 @@ export function useReminders(onFire: (r: Reminder) => void) {
   useEffect(() => {
     const tick = () => {
       const now = Date.now();
-      const due = list.filter((r) => r.start - now <= 60_000);
+      const due = list.filter((r) => r.start - now <= 5 * 60_000);
       if (!due.length) return;
       due.forEach((r) => {
         if (r.start > now - 10 * 60_000) {
