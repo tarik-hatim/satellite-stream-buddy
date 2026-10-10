@@ -9,7 +9,8 @@ import { useSettings } from "@/lib/settings";
 import { useFavorites, useReminders, reminderKey, type Reminder } from "@/lib/prefs";
 import { moveFocus } from "@/lib/dpad";
 import { Button } from "@/components/ui/button";
-import { SlidersHorizontal, X, RotateCcw, ChevronDown, ImageOff } from "lucide-react";
+import { SlidersHorizontal, X, RotateCcw, ChevronDown } from "lucide-react";
+import { ProgrammePoster } from "@/components/programme-poster";
 import { useDeviceMode, type DeviceMode } from "@/lib/device";
 import { UX_COPY } from "@/lib/ux-copy";
 

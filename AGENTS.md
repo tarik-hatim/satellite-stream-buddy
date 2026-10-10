@@ -13,3 +13,4 @@
 - Satellite/region auto-select rules live in src/lib/region.ts with tests in region.test.ts: single source for first-launch behavior.
 - Detect input/device profiles in a browser-safe shared module with a manual session override; user agents are unreliable on Android boxes and TV browsers.
 - Keep advanced filters in a single scoped modal with collapsible groups; results stay visible on the main screen and remote focus cannot escape the panel.
+- Programme artwork comes from XMLTV programme icons with versioned guide caches; show an explicit unavailable state instead of fabricated posters.
