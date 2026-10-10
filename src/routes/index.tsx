@@ -268,7 +268,7 @@ function Index() {
                 {([[true, t.tv], [false, t.radio], [null, t.all]] as const).map(([v, label]) => <Button key={String(v)} data-nav variant={tv === v ? "default" : "outline"} aria-pressed={tv === v} onClick={() => setTv(v)} className="h-11 flex-1">{label}</Button>)}
               </div>
             <FilterRow label={`🎞 ${t.category}`} all={t.all} total={base.length} value={cat} onChange={setCat}
-              items={counts.cat.map(([k, n]) => [k, `${CATEGORY_ICON[k]} ${cl[k]}`, n])} />
+              items={counts.cat.map(([k, n]) => [k, `${CATEGORY_ICON[k]} ${cl?.[k] ?? k}`, n])} />
             <FilterRow label={`🛰 ${t.sat}`} all={t.all} total={base.length} value={sat} onChange={setSat}
               items={counts.sat.map(([k, n]) => [k, `${SATELLITES[k]?.name.split(" ")[0]} ${formatPosition(SATELLITES[k]?.position ?? 0)}`, n])} />
             <FilterRow label={t.bouquet} all={t.all} total={base.length} value={bouquet} onChange={setBouquet}
@@ -504,8 +504,9 @@ function ChannelDetail({ c, g, progs, now, t, lang, fav, onFav, onClose, hasRem,
   hasRem: (k: string) => boolean; toggleRem: (r: Reminder) => void;
 }) {
   const [slot, setSlot] = useState<Slot>("all");
+  const [chosen, setChosen] = useState<Programme | null>(null);
   const nn = g ? nowNext(g.p, now) : null;
-  const focus = nn?.now ?? nn?.next;
+  const focus = chosen ?? nn?.now ?? nn?.next ?? progs[0];
   const sats = SATELLITES.filter((s) => c.satMask & (1 << s.index));
   const list = slot === "all" ? progs : progs.filter((p) => {
     const h = new Date(p.start).getHours(); const [a, b] = SLOTS[slot]; return h >= a && h < b;
@@ -532,24 +533,27 @@ function ChannelDetail({ c, g, progs, now, t, lang, fav, onFav, onClose, hasRem,
       </p>
 
       {focus ? (
-        <div className="mt-4 space-y-3 rounded-2xl border border-border bg-background p-4">
-          {focus.start <= now ? (
+        <div className="mt-4 grid grid-cols-[100px_minmax(0,1fr)] gap-3 border-y border-border py-4 sm:grid-cols-[160px_minmax(0,1fr)] sm:gap-5">
+          <ProgrammePoster key={focus.img ?? focus.title} p={focus} lang={lang} />
+          <div className="min-w-0 space-y-3">
+          {focus.start <= now && focus.stop > now ? (
             <span className="inline-block rounded-lg bg-destructive px-3 py-1 text-sm font-bold text-destructive-foreground">
               ● {t.live} · {fmtT(focus.start, lang)} → {fmtT(focus.stop, lang)} ({fmtDur(focus.stop - now, t)} {t.left})
             </span>
           ) : (
             <span className="inline-block rounded-lg border border-accent px-3 py-1 text-sm">🕒 {fmtT(focus.start, lang)} → {fmtT(focus.stop, lang)} ({fmtDur(focus.stop - focus.start, t)})</span>
           )}
-          {focus.start <= now && <Progress p={focus} now={now} />}
-          <h3 className="text-2xl font-bold">{focus.title}</h3>
+          {focus.start <= now && focus.stop > now && <Progress p={focus} now={now} />}
+          <h3 className="break-words text-lg font-bold sm:text-2xl">{focus.title}</h3>
           {focus.cat && <p className="text-sm"><span className="text-muted-foreground">{t.genre}: </span><b>{focus.cat}</b> · {CATEGORY_ICON[categorize(focus.cat)]} {cl[categorize(focus.cat)]}</p>}
           {focus.start > now && (
             <button data-nav data-on={hasRem(rem(focus).key)} onClick={() => toggleRem(rem(focus))} className="chip">
               🔔 {hasRem(rem(focus).key) ? t.reminderSet : t.remindMe}
             </button>
           )}
+          </div>
           {focus.desc && (
-            <div className="border-t border-border pt-3">
+            <div className="col-span-2 border-t border-border pt-3">
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t.synopsis}</p>
               <p className="mt-1 text-sm leading-relaxed">{focus.desc}</p>
             </div>
@@ -574,7 +578,7 @@ function ChannelDetail({ c, g, progs, now, t, lang, fav, onFav, onClose, hasRem,
                 <li key={p.start} className={`flex gap-3 rounded-xl border p-3 ${live ? "border-primary bg-primary/10" : on ? "border-accent" : "border-border"} ${past ? "opacity-55" : ""}`}>
                   <span className="w-14 shrink-0 font-mono text-sm">{fmtT(p.start, lang)}<br /><span className="text-muted-foreground">→ {fmtT(p.stop, lang)}</span></span>
                   <div className="min-w-0 flex-1">
-                    <p className="font-semibold">{p.title}</p>
+                    <Button data-nav variant="ghost" onClick={() => { setChosen(p); document.querySelector('[data-nav-scope]')?.scrollTo({ top: 0, behavior: "smooth" }); }} className="h-auto w-full justify-start whitespace-normal p-0 text-start font-semibold">{p.title}</Button>
                     {p.cat && <span className="mt-1 inline-block rounded-md border border-accent/50 px-1.5 py-0.5 text-xs text-accent">{p.cat}</span>}
                     {on && <span className="ms-1 mt-1 inline-block rounded-md bg-accent px-1.5 py-0.5 text-xs font-bold text-accent-foreground">🔔 {t.reminderSet}</span>}
                     {p.desc && <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{p.desc}</p>}
