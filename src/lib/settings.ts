@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Lang } from "./i18n";
 import { initialSetup, type Region } from "./region";
+import { DEFAULT_ZONES } from "./epg";
 
 export interface Settings {
   lang: Lang;
@@ -9,6 +10,7 @@ export interface Settings {
   region: Region;
   channelLang: string | null;
   freeOnly: boolean;
+  zones: string[];
 }
 
 const KEY = "pulseepg:settings:v2";
@@ -18,7 +20,7 @@ export function detectSettings(): Settings {
   let tz: string | undefined;
   try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone; } catch { /* ignore */ }
   const s = initialSetup(locale, tz);
-  return { lang: s.lang, langForced: false, satellites: s.satellites, region: s.region, channelLang: null, freeOnly: false };
+  return { lang: s.lang, langForced: false, satellites: s.satellites, region: s.region, channelLang: null, freeOnly: false, zones: DEFAULT_ZONES[s.region] };
 }
 
 /** Settings persisted in localStorage; detected on first launch (client only). */
@@ -29,6 +31,7 @@ export function useSettings() {
       const raw = localStorage.getItem(KEY);
       if (raw) {
         const saved = JSON.parse(raw) as Settings;
+        saved.zones ??= DEFAULT_ZONES[saved.region];
         if (!saved.langForced) saved.lang = detectSettings().lang; // follow phone language unless forced
         return setState(saved);
       }
