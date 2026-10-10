@@ -21,8 +21,8 @@ export const normName = (s: string) =>
 const parseTime = (t: string) => {
   const m = t.match(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})\s*([+-]\d{4})?/);
   if (!m) return 0;
-  const off = m[7] ? (Number(m[7].slice(0, 3)) * 60 + Math.sign(Number(m[7])) * Number(m[7].slice(3))) : 0;
-  return Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]) - off * 60_000;
+  const off = m[7] ? (Number(m[7]!.slice(0, 3)) * 60 + Math.sign(Number(m[7])) * Number(m[7]!.slice(3))) : 0;
+  return Date.UTC(+m[1]!, +m[2]! - 1, +m[3]!, +m[4]!, +m[5]!, +m[6]!) - off * 60_000;
 };
 const unesc = (s: string) => s.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&apos;/g, "'");
 
@@ -30,19 +30,19 @@ const unesc = (s: string) => s.replace(/&amp;/g, "&").replace(/&lt;/g, "<").repl
 export function parseXmltv(xml: string, wanted?: Set<string>): EpgIndex {
   const idToName = new Map<string, string>();
   for (const m of xml.matchAll(/<channel id="([^"]+)"[^>]*>\s*<display-name[^>]*>([^<]+)</g)) {
-    const n = normName(unesc(m[2]));
-    if (!wanted || wanted.has(n)) idToName.set(m[1], n);
+    const n = normName(unesc(m[2]!));
+    if (!wanted || wanted.has(n)) idToName.set(m[1]!, n);
   }
   const now = Date.now(), horizon = now + 24 * 3600_000;
   const out: EpgIndex = {};
   for (const m of xml.matchAll(/<programme start="([^"]+)" stop="([^"]+)" channel="([^"]+)"[^>]*>[\s\S]*?<title[^>]*>([^<]*)</g)) {
-    const n = idToName.get(m[3]);
+    const n = idToName.get(m[3]!);
     if (!n) continue;
-    const start = parseTime(m[1]), stop = parseTime(m[2]);
+    const start = parseTime(m[1]!), stop = parseTime(m[2]!);
     if (stop < now || start > horizon) continue;
-    (out[n] ??= []).push({ start, stop, title: unesc(m[4]) });
+    (out[n] ??= []).push({ start, stop, title: unesc(m[4]!) });
   }
-  for (const k in out) out[k].sort((a, b) => a.start - b.start);
+  for (const k in out) out[k]!.sort((a, b) => a.start - b.start);
   return out;
 }
 
