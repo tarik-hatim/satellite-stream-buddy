@@ -8,6 +8,10 @@ import { CATEGORY_ICON, CATEGORY_LABEL, categorize, type Category } from "@/lib/
 import { useSettings } from "@/lib/settings";
 import { useFavorites, useReminders, reminderKey, type Reminder } from "@/lib/prefs";
 import { moveFocus } from "@/lib/dpad";
+import { Button } from "@/components/ui/button";
+import { SlidersHorizontal, X, RotateCcw, ChevronDown, ImageOff } from "lucide-react";
+import { useDeviceMode, type DeviceMode } from "@/lib/device";
+import { UX_COPY } from "@/lib/ux-copy";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -63,12 +67,15 @@ function Index() {
   const [onlyGuide, setOnlyGuide] = useState(true);
   const [limit, setLimit] = useState(PAGE);
   const [panel, setPanel] = useState<"settings" | "exit" | null>(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const device = useDeviceMode();
   const [selected, setSelected] = useState<Channel | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const lang = settings?.lang ?? "en";
   const t = DICTS[lang];
-  const cl = CATEGORY_LABEL[lang]!;
+  const cl = CATEGORY_LABEL[lang];
+  const ux = UX_COPY[lang];
 
   useEffect(() => { loadCatalog().then(setCatalog); }, []);
   useEffect(() => {
@@ -107,6 +114,7 @@ function Index() {
       if (e.key === "Escape" || (e.key === "Backspace" && !inInput) || e.key === "GoBack" || e.keyCode === 10009 || e.keyCode === 461) {
         e.preventDefault();
         if (selected) setSelected(null);
+        else if (filtersOpen) setFiltersOpen(false);
         else setPanel((p) => (p ? null : "exit"));
         return;
       }
@@ -114,13 +122,13 @@ function Index() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [selected]);
+  }, [selected, filtersOpen]);
   useEffect(() => {
     history.pushState({ pulse: 1 }, "");
-    const onPop = () => { history.pushState({ pulse: 1 }, ""); setPanel("exit"); };
+    const onPop = () => { history.pushState({ pulse: 1 }, ""); if (selected) setSelected(null); else if (filtersOpen) setFiltersOpen(false); else setPanel((p) => p ? null : "exit"); };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
-  }, []);
+  }, [selected, filtersOpen]);
 
   const range = useMemo(() => dayRange(day), [day, Math.floor(now / 3600_000)]);
   const guideOf = useCallback((c: Channel): EpgChannel | undefined => epg[normName(c.name)], [epg]);
@@ -188,9 +196,11 @@ function Index() {
     ["live", "●", t.liveNow], ["grid", "▦", t.grid], ["favorites", "♡", t.favorites], ["reminders", "🔔", `${t.remindMe.split(" ")[0]} ${reminders.length || ""}`],
   ];
   const sats = SATELLITES.filter((s) => settings.satellites.includes(s.index));
+  const activeFilters = [cat, sat, bouquet, zone, genre, settings.channelLang].filter((v) => v !== null).length + Number(tv !== true) + Number(settings.freeOnly);
+  const clearFilters = () => { setCat(null); setSat(null); setBouquet(null); setZone(null); setGenre(null); setTv(true); update({ channelLang: null, freeOnly: false }); };
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-6xl flex-col gap-4 px-3 py-4 md:px-8">
+    <div data-device={device.mode} data-remote={device.remote} className="app-shell mx-auto flex min-h-screen max-w-6xl flex-col gap-3 px-3 py-3 md:px-8">
       {banner && (
         <div role="alert" className="fixed inset-x-3 top-3 z-[60] mx-auto flex max-w-xl items-center gap-3 rounded-2xl border border-primary bg-card p-4 shadow-2xl">
           <span className="text-2xl">🔔</span>
@@ -202,12 +212,12 @@ function Index() {
         </div>
       )}
 
-      <header className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <span className="grid size-11 place-items-center rounded-xl bg-primary text-xl font-bold text-primary-foreground">P</span>
-          <div>
-            <h1 className="text-xl font-bold tracking-tight md:text-2xl">Pulse<span className="text-primary">EPG</span></h1>
-            <p className="text-xs text-muted-foreground">{t.tagline} · {t[`region_${settings.region}`]}</p>
+      <header className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-primary text-xl font-bold text-primary-foreground">P</span>
+          <div className="min-w-0">
+            <h1 className="text-lg font-bold md:text-2xl">Pulse<span className="text-primary">EPG</span></h1>
+            <p className="truncate text-[10px] text-muted-foreground">{t.tagline} · {t[`region_${settings.region}`]}</p>
           </div>
         </div>
         <div className="flex gap-2">
@@ -220,7 +230,7 @@ function Index() {
 
       <nav className="-mx-3 flex gap-2 overflow-x-auto px-3 pb-1">
         {tabs.map(([k, icon, label]) => (
-          <button key={k} data-nav data-on={tab === k} onClick={() => setTab(k)} className="chip text-base">
+          <button key={k} data-nav data-on={tab === k} onClick={() => setTab(k)} className="chip shrink-0 text-sm">
             <span>{icon}</span>{label}
           </button>
         ))}
@@ -230,25 +240,37 @@ function Index() {
         <RemindersView reminders={reminders} t={t} lang={lang} onRemove={toggleRem} now={now} />
       ) : (
         <>
-          <section className="flex flex-col gap-3 rounded-2xl border border-border bg-card/60 p-3">
-            <input data-nav value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t.search}
-              className="w-full rounded-xl border border-input bg-background px-4 py-3 text-base outline-none focus:border-ring" />
-            <div className="flex flex-wrap items-center gap-2 text-sm">
-              <span className="flex items-center gap-2 rounded-xl bg-background px-3 py-2 font-mono">
-                <span className="size-2 animate-pulse rounded-full bg-destructive" />
-                {new Date(now).toLocaleDateString(lang, { weekday: "short", day: "numeric", month: "short" })}
-                <b>{fmtT(now, lang)}</b>
-                <span className="rounded-md border border-accent/60 px-1.5 text-xs text-accent">UTC{off >= 0 ? "+" : ""}{off} {tz.split("/").pop()?.replace("_", " ")}</span>
-              </span>
-              {([[true, t.tv], [false, t.radio], [null, t.all]] as const).map(([v, label]) => (
-                <button key={String(v)} data-nav data-on={tv === v} onClick={() => setTv(v)} className="chip">{label}</button>
-              ))}
+          <section aria-label={ux.filters} className="space-y-2">
+            <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+              <input data-nav aria-label={t.search} value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t.search}
+                className="h-11 min-w-0 w-full rounded-lg border border-input bg-card px-3 text-sm outline-none focus:border-ring" />
+              <Button data-nav variant={activeFilters ? "default" : "outline"} className="h-11 px-3" onClick={() => setFiltersOpen(true)} aria-haspopup="dialog" aria-expanded={filtersOpen}>
+                <SlidersHorizontal /> {ux.filters}{activeFilters > 0 && <span className="font-bold">{activeFilters}</span>}
+              </Button>
             </div>
+            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+              <p className="min-w-0 text-xs text-muted-foreground"><b className="text-foreground">{filtered.length.toLocaleString(lang)}</b> {t.channels} · {activeProgs.toLocaleString(lang)} {t.activeProgs}</p>
+              <select data-nav aria-label={t.schedule} value={day} onChange={(e) => setDay(Number(e.target.value))} className="h-9 max-w-36 rounded-md border border-input bg-card px-2 text-xs">
+                {[-1, 0, 1, 2, 3, 4, 5, 6].map((d) => <option key={d} value={d}>{d === -1 ? t.catchup : d === 0 ? t.today : new Date(dayRange(d)[0]).toLocaleDateString(lang, { weekday: "short", day: "numeric" })}</option>)}
+              </select>
+            </div>
+            {epgState === "loading" && <p className="text-xs text-accent">{t.epgLoading}</p>}
+            {epgState === "error" && <p className="text-xs text-destructive">{t.epgError}</p>}
+          </section>
 
+          {filtersOpen && (
+            <Modal onClose={() => setFiltersOpen(false)} filter>
+              <div className="sticky top-0 z-10 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-border bg-card pb-3">
+                <h2 className="text-lg font-bold">{ux.filters} {activeFilters > 0 && <span className="text-primary">· {activeFilters}</span>}</h2>
+                <Button data-nav autoFocus size="icon" variant="ghost" aria-label={t.close} onClick={() => setFiltersOpen(false)}><X /></Button>
+              </div>
+              <div className="my-3 flex gap-2">
+                {([[true, t.tv], [false, t.radio], [null, t.all]] as const).map(([v, label]) => <Button key={String(v)} data-nav variant={tv === v ? "default" : "outline"} aria-pressed={tv === v} onClick={() => setTv(v)} className="h-11 flex-1">{label}</Button>)}
+              </div>
             <FilterRow label={`🎞 ${t.category}`} all={t.all} total={base.length} value={cat} onChange={setCat}
               items={counts.cat.map(([k, n]) => [k, `${CATEGORY_ICON[k]} ${cl[k]}`, n])} />
             <FilterRow label={`🛰 ${t.sat}`} all={t.all} total={base.length} value={sat} onChange={setSat}
-              items={counts.sat.map(([k, n]) => [k, `${SATELLITES[k]!.name.split(" ")[0]} ${formatPosition(SATELLITES[k]!.position)}`, n])} />
+              items={counts.sat.map(([k, n]) => [k, `${SATELLITES[k]?.name.split(" ")[0]} ${formatPosition(SATELLITES[k]?.position ?? 0)}`, n])} />
             <FilterRow label={t.bouquet} all={t.all} total={base.length} value={bouquet} onChange={setBouquet}
               items={counts.bouquet.map(([k, n]) => [k, k, n])} />
             <FilterRow label={`🌐 ${t.zone}`} all={`🌍 ${t.all}`} total={base.length} value={zone} onChange={setZone}
@@ -256,28 +278,18 @@ function Index() {
             <FilterRow label={`✦ ${t.genre}`} all={t.allGenres} total={base.length} value={genre} onChange={setGenre}
               items={counts.genre.map(([k, n]) => [k, k, n])} />
 
-            <div className="flex items-center gap-2 overflow-x-auto pb-1">
-              <span className="shrink-0 text-xs font-semibold uppercase text-muted-foreground">📅 7-day EPG</span>
-              {[-1, 0, 1, 2, 3, 4, 5, 6].map((d) => (
-                <button key={d} data-nav data-on={day === d} onClick={() => setDay(d)} className="chip">
-                  {d === -1 ? t.catchup : d === 0 ? `${t.today} (24h)` : new Date(dayRange(d)[0]).toLocaleDateString(lang, { weekday: "short", day: "numeric" })}
-                </button>
-              ))}
-            </div>
 
-            <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-              <span><b className="text-foreground">{filtered.length.toLocaleString(lang)}</b> {t.displayedOf} {base.length.toLocaleString(lang)}</span>
-              <span>•</span>
-              <span>{activeProgs.toLocaleString(lang)} {t.activeProgs}</span>
-              {tab !== "favorites" && (
-                <button data-nav data-on={!onlyGuide} onClick={() => setOnlyGuide((v) => !v)} className="chip ms-auto text-xs">
-                  {t.all} {t.channels}
-                </button>
-              )}
-            </div>
-            {epgState === "loading" && <p className="text-sm text-accent">{t.epgLoading}</p>}
-            {epgState === "error" && <p className="text-sm text-destructive">{t.epgError}</p>}
-          </section>
+              <FilterRow label={t.channelLang} all={t.anyLang} total={base.length} value={settings.channelLang} onChange={(v) => update({ channelLang: v })} items={CHANNEL_LANGS.map((l) => [l, l.toUpperCase(), 0])} />
+              <div className="space-y-3 border-t border-border py-3 text-sm">
+                <label className="flex min-h-11 items-center justify-between gap-3">{t.freeOnly}<input data-nav type="checkbox" checked={settings.freeOnly} onChange={(e) => update({ freeOnly: e.target.checked })} className="size-5 accent-primary" /></label>
+                {tab !== "favorites" && <label className="flex min-h-11 items-center justify-between gap-3">{t.all} {t.channels}<input data-nav type="checkbox" checked={!onlyGuide} onChange={(e) => setOnlyGuide(!e.target.checked)} className="size-5 accent-primary" /></label>}
+              </div>
+              <div className="sticky bottom-0 grid grid-cols-[auto_minmax(0,1fr)] gap-2 border-t border-border bg-card pt-3">
+                <Button data-nav variant="outline" className="h-11" onClick={clearFilters}><RotateCcw />{ux.clear}</Button>
+                <Button data-nav className="h-11 min-w-0 whitespace-normal" onClick={() => setFiltersOpen(false)}>{ux.results} · {filtered.length.toLocaleString(lang)}</Button>
+              </div>
+            </Modal>
+          )}
 
           {!catalog && <p className="py-10 text-center text-muted-foreground">{t.loading}</p>}
           {catalog && filtered.length === 0 && (
@@ -311,6 +323,10 @@ function Index() {
           <h2 className="text-xl font-bold">{t.settings}</h2>
           <p className="mt-1 text-xs text-muted-foreground">{t.detected}: {t[`region_${settings.region}`]}</p>
 
+          <h3 className="mt-5 font-semibold">{ux.device}</h3>
+          <select data-nav aria-label={ux.device} value={device.override ?? "auto"} onChange={(e) => device.setOverride(e.target.value === "auto" ? null : e.target.value as DeviceMode)} className="mt-2 h-11 w-full rounded-md border border-input bg-background px-3 text-sm">
+            <option value="auto">{ux.auto}</option><option value="mobile">{ux.mobile}</option><option value="android-box">Android TV Box</option><option value="android-tv">Android TV</option><option value="fire-tv">Fire TV Stick</option><option value="desktop">Desktop</option>
+          </select>
           <h3 className="mt-5 font-semibold">{t.language}</h3>
           <p className="text-xs text-muted-foreground">{t.languageHint}</p>
           <div className="mt-2 flex flex-wrap gap-2">
@@ -375,17 +391,22 @@ function FilterRow<K extends string | number>({ label, all, total, value, onChan
 }) {
   if (items.length === 0) return null;
   return (
-    <div className="flex items-center gap-2 overflow-x-auto border-t border-border/60 pt-3 pb-1">
-      <span className="shrink-0 text-xs font-semibold uppercase text-muted-foreground">{label}</span>
-      <button data-nav data-on={value === null} onClick={() => onChange(null)} className="chip">
-        {all} <Count n={total} />
-      </button>
-      {items.map(([k, l, n]) => (
-        <button key={String(k)} data-nav data-on={value === k} onClick={() => onChange(value === k ? null : k)} className="chip">
-          {l} <Count n={n} />
-        </button>
-      ))}
-    </div>
+    <details className="filter-group border-t border-border py-1">
+      <summary data-nav className="grid min-h-11 cursor-pointer list-none grid-cols-[minmax(0,1fr)_auto] items-center gap-2 text-sm">
+        <span className="min-w-0">{label}<span className="ms-2 text-xs text-primary">{value === null ? all : items.find(([k]) => k === value)?.[1] ?? String(value)}</span></span>
+        <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
+      </summary>
+      <div className="grid grid-cols-2 gap-2 pb-3">
+        <Button data-nav variant={value === null ? "default" : "outline"} aria-pressed={value === null} onClick={() => onChange(null)} className="min-h-11 h-auto justify-between whitespace-normal px-3 py-2 text-start">
+          {all} <Count n={total} />
+        </Button>
+        {items.map(([k, l, n]) => (
+          <Button key={String(k)} data-nav variant={value === k ? "default" : "outline"} aria-pressed={value === k} onClick={() => onChange(value === k ? null : k)} className="min-h-11 h-auto min-w-0 justify-between whitespace-normal px-3 py-2 text-start">
+            <span className="min-w-0 break-words">{l}</span> {n > 0 && <Count n={n} />}
+          </Button>
+        ))}
+      </div>
+    </details>
   );
 }
 const Count = ({ n }: { n: number }) => <span className="rounded-full bg-background/70 px-2 text-xs font-semibold text-foreground">{n}</span>;
@@ -610,11 +631,27 @@ function RemindersView({ reminders, t, lang, onRemove, now }: { reminders: Remin
   );
 }
 
-function Modal({ children, onClose, wide }: { children: ReactNode; onClose: () => void; wide?: boolean }) {
+function Modal({ children, onClose, wide, filter }: { children: ReactNode; onClose: () => void; wide?: boolean; filter?: boolean }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    ref.current?.querySelector<HTMLElement>("[autofocus], [data-nav]")?.focus();
+    const trap = (event: KeyboardEvent) => {
+      if (event.key !== "Tab") return;
+      const items = Array.from(ref.current?.querySelectorAll<HTMLElement>("button, input, select, summary, [tabindex='0']") ?? []).filter((el) => el.offsetParent !== null && !el.hasAttribute("disabled"));
+      const first = items[0], last = items.at(-1);
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+    };
+    window.addEventListener("keydown", trap);
+    return () => { document.body.style.overflow = previousOverflow; window.removeEventListener("keydown", trap); previous?.focus(); };
+  }, []);
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-background/80 p-3 backdrop-blur-sm" onClick={onClose}>
-      <div data-nav-scope role="dialog" aria-modal onClick={(e) => e.stopPropagation()}
-        className={`max-h-[92vh] w-full overflow-y-auto rounded-2xl border border-border bg-card p-4 shadow-2xl ${wide ? "max-w-2xl" : "max-w-xl"}`}>
+    <div className={`fixed inset-0 z-50 grid bg-background/80 backdrop-blur-sm ${filter ? "filter-overlay items-end justify-items-center p-0 sm:place-items-center sm:p-4" : "place-items-center p-3"}`} onClick={onClose}>
+      <div ref={ref} data-nav-scope role="dialog" aria-modal onClick={(e) => e.stopPropagation()}
+        className={`max-h-[88dvh] w-full overflow-y-auto rounded-lg border border-border bg-card p-4 shadow-2xl ${filter ? "filter-dialog max-w-xl" : wide ? "max-w-2xl" : "max-w-xl"}`}>
         {children}
       </div>
     </div>
