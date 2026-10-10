@@ -131,7 +131,23 @@ const tr: Dict = {
   region_TURKEY: "Türkiye", region_UNKNOWN: "Bilinmiyor", frequency: "Frekans",
 };
 
-export const DICTS: Record<Lang, Dict> = { en, fr, ar, es, pt, de, tr };
+const X = {
+  en: ["Live now","TV Grid","Favorites","Category","Sat","Bouquet","Zone","Genre","All genres","Catch-up","Today","Remind me","Reminder set","left","LIVE","Upcoming","Ended","programmes","Guide zones","Choose which epgshare01 regions to download.","No favorites yet. Tap the heart on a channel.","channels displayed out of","active programmes","Programme synopsis","Audio","All day","Morning","Afternoon","Evening","Night","Starting now","Refresh guide","Programme schedule","min"],
+  fr: ["En direct","Grille TV","Favoris","Catégorie","Sat","Bouquet","Zone","Genre","Tous les genres","Replay","Aujourd'hui","Me rappeler","Rappel activé","restant","DIRECT","À venir","Terminé","programmes","Zones du guide","Choisissez les régions epgshare01 à télécharger.","Aucun favori. Touchez le cœur d'une chaîne.","chaînes affichées sur","programmes en cours","Synopsis","Audio","Toute la journée","Matin","Après-midi","Soirée","Nuit","Commence maintenant","Actualiser le guide","Programme de la journée","min"],
+  ar: ["مباشر الآن","شبكة البرامج","المفضلة","الفئة","القمر","الباقة","المنطقة","النوع","كل الأنواع","إعادة","اليوم","ذكّرني","تم ضبط التذكير","متبقية","مباشر","قادم","انتهى","برامج","مناطق الدليل","اختر مناطق epgshare01 للتحميل.","لا توجد مفضلة بعد. اضغط على القلب.","قناة معروضة من","برنامج جارٍ","ملخص البرنامج","الصوت","طوال اليوم","الصباح","الظهيرة","المساء","الليل","يبدأ الآن","تحديث الدليل","جدول البرامج","د"],
+  es: ["En directo","Parrilla TV","Favoritos","Categoría","Sat","Paquete","Zona","Género","Todos los géneros","Diferido","Hoy","Recordarme","Recordatorio activado","restantes","EN VIVO","Próximo","Terminado","programas","Zonas de la guía","Elige qué regiones de epgshare01 descargar.","Sin favoritos. Toca el corazón de un canal.","canales mostrados de","programas en emisión","Sinopsis","Audio","Todo el día","Mañana","Tarde","Noche","Madrugada","Empieza ahora","Actualizar guía","Programación","min"],
+  pt: ["Ao vivo","Grade de TV","Favoritos","Categoria","Sat","Pacote","Zona","Gênero","Todos os gêneros","Catch-up","Hoje","Lembrar","Lembrete ativado","restantes","AO VIVO","A seguir","Encerrado","programas","Zonas do guia","Escolha quais regiões do epgshare01 baixar.","Sem favoritos. Toque no coração de um canal.","canais exibidos de","programas no ar","Sinopse do programa","Áudio","O dia todo","Manhã","Tarde","Noite","Madrugada","Começando agora","Atualizar guia","Programação","min"],
+  de: ["Jetzt live","TV-Raster","Favoriten","Kategorie","Sat","Paket","Zone","Genre","Alle Genres","Rückblick","Heute","Erinnern","Erinnerung aktiv","übrig","LIVE","Demnächst","Beendet","Sendungen","Guide-Zonen","Wähle die epgshare01-Regionen zum Laden.","Noch keine Favoriten. Tippe auf das Herz.","Sender angezeigt von","laufende Sendungen","Inhalt","Audio","Ganzer Tag","Morgen","Nachmittag","Abend","Nacht","Beginnt jetzt","Guide aktualisieren","Tagesprogramm","Min"],
+  tr: ["Şimdi canlı","TV Akışı","Favoriler","Kategori","Uydu","Paket","Bölge","Tür","Tüm türler","Geçmiş","Bugün","Hatırlat","Hatırlatıcı kuruldu","kaldı","CANLI","Yakında","Bitti","program","Rehber bölgeleri","İndirilecek epgshare01 bölgelerini seçin.","Henüz favori yok. Kanaldaki kalbe dokunun.","kanal gösteriliyor /","yayındaki program","Program özeti","Ses","Tüm gün","Sabah","Öğleden sonra","Akşam","Gece","Şimdi başlıyor","Rehberi yenile","Yayın akışı","dk"],
+} as const;
+const XK = ["liveNow","grid","favorites","category","sat","bouquet","zone","genre","allGenres","catchup","today","remindMe","reminderSet","left","live","upcoming","ended","programmes","epgZones","zonesHint","noFavorites","displayedOf","activeProgs","synopsis","audio","allDay","morning","afternoon","evening","night","startingNow","refreshEpg","schedule","min"] as const;
+type Extra = Record<(typeof XK)[number], string>;
+const ext = (l: Lang) => Object.fromEntries(XK.map((k, i) => [k, X[l][i]])) as Extra;
+export type FullDict = Dict & Extra;
+export const DICTS: Record<Lang, FullDict> = {
+  en: { ...en, ...ext("en") }, fr: { ...fr, ...ext("fr") }, ar: { ...ar, ...ext("ar") }, es: { ...es, ...ext("es") },
+  pt: { ...pt, ...ext("pt") }, de: { ...de, ...ext("de") }, tr: { ...tr, ...ext("tr") },
+};
 
 /** Normalises ISO 639-1/639-2 audio tags (ara, fre, fra, ger, deu…) to UI codes. */
 const AUDIO_MAP: Record<string, string> = {
