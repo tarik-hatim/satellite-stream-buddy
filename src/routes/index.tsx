@@ -84,17 +84,20 @@ function Index() {
     document.documentElement.dir = isRtl(lang) ? "rtl" : "ltr";
   }, [lang]);
 
-  const zonesKey = `${settings?.zones.join(",")}|${settings?.satellites.join(",")}`;
+  // Guide zones are derived only from channels on the selected satellites — nothing else is downloaded.
+  const activeZones = useMemo(() => {
+    if (!catalog || !settings) return [] as string[];
+    const mask = settings.satellites.reduce((m, i) => m | (1 << i), 0);
+    return [...new Set(catalog.filter((c) => c.zone && (c.satMask & mask)).map((c) => c.zone!))].sort();
+  }, [catalog, settings?.satellites]);
+  const zonesKey = activeZones.join(",");
   const fetchGuide = useCallback(async (force = false) => {
     if (!catalog || !settings) return;
     setEpgState("loading");
     const wanted = new Set(catalog.map((c) => normName(c.name)));
     let ok = 0;
-    // Load 3 countries at a time: faster than one by one, still light on TV boxes.
-    // Countries are derived from the channels on the chosen satellites — no manual picking needed.
-    const mask = settings.satellites.reduce((m, i) => m | (1 << i), 0);
-    const auto = new Set(catalog.filter((c) => c.zone && (c.satMask & mask)).map((c) => c.zone!));
-    const queue = [...new Set([...auto, ...settings.zones])];
+    // Load 3 zones at a time: faster than one by one, still light on TV boxes.
+    const queue = [...activeZones];
     const worker = async () => {
       for (let z = queue.shift(); z; z = queue.shift()) {
         const zone = z;
@@ -113,7 +116,7 @@ function Index() {
   useEffect(() => {
     if (!catalog || !settings) return;
     setEpg({});
-    cachedZones([...new Set([...catalog.filter((c) => c.zone).map((c) => c.zone!), ...settings.zones])]).then((c) => { setEpg(c); void fetchGuide(); });
+    cachedZones(activeZones).then((c) => { setEpg(c); void fetchGuide(); });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [catalog, zonesKey]);
 
@@ -193,8 +196,6 @@ function Index() {
 
   const toggleSat = (i: number) =>
     update((s) => ({ satellites: s.satellites.includes(i) ? s.satellites.filter((x) => x !== i) : [...s.satellites, i].sort((a, b) => a - b) }));
-  const toggleZone = (z: string) =>
-    update((s) => ({ zones: s.zones.includes(z) ? s.zones.filter((x) => x !== z) : [...s.zones, z] }));
   const onImport = async (e: ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (f) setCatalog(await importChmax(await f.text()));
@@ -352,11 +353,10 @@ function Index() {
             ))}
           </div>
 
-          <h3 className="mt-5 font-semibold">{t.epgZones}</h3>
-          <p className="text-xs text-muted-foreground">{t.zonesHint}</p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {Object.entries(ZONES).map(([k, z]) => (
-              <button key={k} data-nav data-on={settings.zones.includes(k)} onClick={() => toggleZone(k)} className="chip">{z.flag} {z.label}</button>
+          <h3 className="mt-5 font-semibold">{t.epgZones} ({activeZones.length})</h3>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {activeZones.map((k) => (
+              <span key={k} className="chip text-xs" data-on>{zoneLabel(k)}</span>
             ))}
           </div>
 
