@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, ty
 import { SATELLITES, formatPosition } from "@/lib/satellites";
 import { CHANNEL_LANGS, DICTS, LANGS, LANG_NAMES, isRtl, type FullDict, type Lang } from "@/lib/i18n";
 import { filterChannels, importChmax, loadCatalog, type Channel } from "@/lib/catalog";
-import { ZONES, cachedZones, dayRange, inRange, loadZone, normName, nowNext, type EpgChannel, type EpgIndex, type Programme } from "@/lib/epg";
+import { ZONES, zoneLabel, cachedZones, dayRange, inRange, loadZone, normName, nowNext, type EpgChannel, type EpgIndex, type Programme } from "@/lib/epg";
 import { CATEGORY_ICON, CATEGORY_LABEL, categorize, type Category } from "@/lib/categories";
 import { useSettings } from "@/lib/settings";
 import { useFavorites, useReminders, reminderKey, type Reminder } from "@/lib/prefs";

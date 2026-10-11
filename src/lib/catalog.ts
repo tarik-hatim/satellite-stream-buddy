@@ -20,7 +20,7 @@ export interface Channel {
 }
 
 type Row = [string, string, number, string, number, string[], number[], string, string, string, string?];
-const CACHE_KEY = "catalog:v6-footprint";
+const CACHE_KEY = "catalog:v7-sources";
 
 function fromRows(rows: Row[]): Channel[] {
   return rows.map(([id, name, tv, provider, ca, langs, sats, freq, pol, sr, zone]) => ({
