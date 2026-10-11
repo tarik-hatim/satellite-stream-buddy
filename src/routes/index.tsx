@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from "react";
-import { SATELLITES, formatPosition } from "@/lib/satellites";
+import { SATELLITES, formatPosition, shortName } from "@/lib/satellites";
 import { CHANNEL_LANGS, DICTS, LANGS, LANG_NAMES, isRtl, type FullDict, type Lang } from "@/lib/i18n";
 import { filterChannels, importChmax, loadCatalog, type Channel } from "@/lib/catalog";
 import { ZONES, zoneLabel, cachedZones, dayRange, inRange, loadZone, normName, nowNext, type EpgChannel, type EpgIndex, type Programme } from "@/lib/epg";
