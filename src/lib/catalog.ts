@@ -18,7 +18,7 @@ export interface Channel {
 }
 
 type Row = [string, string, number, string, number, string[], number[], string, string, string];
-const CACHE_KEY = "catalog:v1";
+const CACHE_KEY = "catalog:v2-tv";
 
 function fromRows(rows: Row[]): Channel[] {
   return rows.map(([id, name, tv, provider, ca, langs, sats, freq, pol, sr]) => ({
@@ -47,10 +47,10 @@ export async function importChmax(text: string): Promise<Channel[]> {
       receptions?: Array<{ satelliteIndex: number; frequency?: string; polarization?: string; symbolRate?: string }>;
     }>;
   };
-  const rows: Row[] = d.channels.map((c, i) => {
+  const rows: Row[] = d.channels.filter((c) => c.TVType === "TV").map((c, i) => {
     const r = c.receptions?.[0];
     return [
-      c.id ?? `ch_${i}`, (c.Name ?? "?").trim(), c.TVType === "TV" ? 1 : 0, (c.Provider ?? "").trim(), c.CA ? 1 : 0,
+      c.id ?? `ch_${i}`, (c.Name ?? "?").trim(), 1, (c.Provider ?? "").trim(), c.CA ? 1 : 0,
       [...new Set((c.Audio ?? []).map((a) => (a.Lang ?? "").toLowerCase().slice(0, 3)).filter(Boolean))],
       [...new Set((c.receptions ?? []).map((x) => x.satelliteIndex))],
       r?.frequency ?? "", r?.polarization ?? "", r?.symbolRate ?? "",

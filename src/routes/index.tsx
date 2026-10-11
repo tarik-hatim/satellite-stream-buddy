@@ -65,7 +65,7 @@ function Index() {
   const [zone, setZone] = useState<string | null>(null);
   const [genre, setGenre] = useState<string | null>(null);
   const [day, setDay] = useState(0);
-  const [onlyGuide, setOnlyGuide] = useState(true);
+  const [onlyGuide, setOnlyGuide] = useState(false);
   const [limit, setLimit] = useState(PAGE);
   const [panel, setPanel] = useState<"settings" | "exit" | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
