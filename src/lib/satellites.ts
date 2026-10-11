@@ -28,6 +28,10 @@ export const SATELLITES: readonly Satellite[] = [
 export const formatPosition = (p: number) =>
   `${Math.abs(p).toFixed(1)}°${p >= 0 ? "E" : "W"}`;
 
+/** Compact label for tight UI spots: strips variant suffixes (Badr 4/5/6/7 → Badr). */
+export const shortName = (name: string) =>
+  name.split("/")[0].replace(/\s\d+$/, "").replace(/-\d+$/, "").trim();
+
 /** CHMAX "Angle" field: tenths of degree, West stored as 3600 - x. */
 export const angleToPosition = (angle: string | number) => {
   const a = Number(angle);
