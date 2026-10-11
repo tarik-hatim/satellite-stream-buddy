@@ -90,13 +90,19 @@ function Index() {
     setEpgState("loading");
     const wanted = new Set(catalog.map((c) => normName(c.name)));
     let ok = 0;
-    for (const z of settings.zones) {
-      try {
-        const d = await loadZone(z, wanted, force);
-        ok++;
-        setEpg((p) => { const n = { ...p }; for (const k in d) { const entry = d[k]; if (entry && (!n[k] || n[k]?.z === z)) n[k] = entry; } return n; });
-      } catch { /* zone unreachable */ }
-    }
+    // Load 3 countries at a time: faster than one by one, still light on TV boxes.
+    const queue = [...settings.zones];
+    const worker = async () => {
+      for (let z = queue.shift(); z; z = queue.shift()) {
+        const zone = z;
+        try {
+          const d = await loadZone(zone, wanted, force);
+          ok++;
+          setEpg((p) => { const n = { ...p }; for (const k in d) { const entry = d[k]; if (entry && (!n[k] || n[k]?.z === zone)) n[k] = entry; } return n; });
+        } catch { /* zone unreachable */ }
+      }
+    };
+    await Promise.all([worker(), worker(), worker()]);
     setEpgState(ok ? "idle" : "error");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [catalog, zonesKey]);
