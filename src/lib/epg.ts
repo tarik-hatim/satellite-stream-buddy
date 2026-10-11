@@ -134,8 +134,23 @@ export function parseXmltv(xml: string, zone: string, wanted?: Set<string>): Epg
   return out;
 }
 
+/** Zone ids: "FR1" = epgshare01, "OE_turkey1" = open-epg.com, "PW_FR" = epg.pw. */
+export function zoneFile(zone: string): string {
+  if (zone.startsWith("OE_")) return `oe:${zone.slice(3)}.xml`;
+  if (zone.startsWith("PW_")) return `pw:epg_${zone.slice(3)}.xml.gz`;
+  return `epg_ripper_${zone}.xml.gz`;
+}
+
+const PW_LABEL: Record<string, string> = { FR: "France", GB: "United Kingdom", RU: "Russia", DE: "Germany", BR: "Brazil", US: "USA" };
+export function zoneLabel(zone: string): string {
+  if (ZONES[zone]) return `${ZONES[zone]!.flag} ${ZONES[zone]!.label}`;
+  if (zone.startsWith("PW_")) return PW_LABEL[zone.slice(3)] ?? zone.slice(3);
+  const c = zone.replace(/^OE_/, "").replace(/\d+$/, "").replace(/([a-z])(arabia|kingdom)/, "$1 $2");
+  return c.charAt(0).toUpperCase() + c.slice(1);
+}
+
 async function fetchZone(zone: string): Promise<string> {
-  const res = await fetch(`/api/public/epg?file=epg_ripper_${zone}.xml.gz`);
+  const res = await fetch(`/api/public/epg?file=${encodeURIComponent(zoneFile(zone))}`);
   if (!res.ok) throw new Error(`EPG ${res.status}`);
   const buf = new Uint8Array(await res.arrayBuffer());
   const gz = buf[0] === 0x1f && buf[1] === 0x8b;

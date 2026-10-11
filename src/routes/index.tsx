@@ -281,7 +281,7 @@ function Index() {
             <FilterRow label={t.bouquet} all={t.all} total={base.length} value={bouquet} onChange={setBouquet}
               items={counts.bouquet.map(([k, n]) => [k, k, n])} />
             <FilterRow label={`🌐 ${t.zone}`} all={`🌍 ${t.all}`} total={base.length} value={zone} onChange={setZone}
-              items={counts.zone.map(([k, n]) => [k, `${ZONES[k]?.flag ?? ""} ${ZONES[k]?.label ?? k}`, n])} />
+              items={counts.zone.map(([k, n]) => [k, zoneLabel(k), n])} />
             <FilterRow label={`✦ ${t.genre}`} all={t.allGenres} total={base.length} value={genre} onChange={setGenre}
               items={counts.genre.map(([k, n]) => [k, k, n])} />
 
@@ -536,7 +536,7 @@ function ChannelDetail({ c, g, progs, now, t, lang, fav, onFav, onClose, hasRem,
       </div>
 
       <p className="mt-3 text-xs text-muted-foreground">
-        {t.frequency}: {c.freq} {c.pol} {c.sr}{c.langs.length > 0 && ` · ${t.audio}: ${c.langs.join(" + ").toUpperCase()}`}{g && ` · ${ZONES[g.z]?.flag ?? ""} ${ZONES[g.z]?.label ?? g.z}`}
+        {t.frequency}: {c.freq} {c.pol} {c.sr}{c.langs.length > 0 && ` · ${t.audio}: ${c.langs.join(" + ").toUpperCase()}`}{g && ` · ${zoneLabel(g.z)}`}
       </p>
 
       {focus ? (
