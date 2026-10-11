@@ -353,11 +353,21 @@ function Index() {
             ))}
           </div>
 
-          <h3 className="mt-5 font-semibold">{t.epgZones} ({activeZones.length})</h3>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {activeZones.map((k) => (
-              <span key={k} className="chip text-xs" data-on>{zoneLabel(k)}</span>
-            ))}
+          {(() => {
+            // Same country can come from several guide sources — show it once with its source count.
+            const byCountry = new Map<string, number>();
+            for (const k of activeZones) { const l = zoneLabel(k).replace(/\s\d+$/, ""); byCountry.set(l, (byCountry.get(l) ?? 0) + 1); }
+            const list = [...byCountry].sort((a, b) => a[0].replace(/^\S+\s/, "").localeCompare(b[0].replace(/^\S+\s/, "")));
+            return (<>
+              <h3 className="mt-5 font-semibold">{t.epgZones} ({list.length})</h3>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {list.map(([l, n]) => (
+                  <span key={l} className="chip text-xs" data-on>{l}{n > 1 && <span className="ms-1 opacity-70">×{n}</span>}</span>
+                ))}
+              </div>
+            </>);
+          })()}
+          <div className="hidden">
           </div>
 
           <h3 className="mt-5 font-semibold">{t.channelLang}</h3>
