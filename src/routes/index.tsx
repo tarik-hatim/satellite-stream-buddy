@@ -113,7 +113,7 @@ function Index() {
   useEffect(() => {
     if (!catalog || !settings) return;
     setEpg({});
-    cachedZones(settings.zones).then((c) => { setEpg(c); void fetchGuide(); });
+    cachedZones([...new Set([...catalog.filter((c) => c.zone).map((c) => c.zone!), ...settings.zones])]).then((c) => { setEpg(c); void fetchGuide(); });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [catalog, zonesKey]);
 
