@@ -14,3 +14,4 @@
 - Detect input/device profiles in a browser-safe shared module with a manual session override; user agents are unreliable on Android boxes and TV browsers.
 - Keep advanced filters in a single scoped modal with collapsible groups; results stay visible on the main screen and remote focus cannot escape the panel.
 - Programme artwork comes from XMLTV programme icons with versioned guide caches; show an explicit unavailable state instead of fabricated posters.
+- Catalog rows are deduplicated per (channel name, bouquet/provider) and carry their own guide zone; the guide is looked up by zone+name so the same channel in different bouquets keeps its own feed.
