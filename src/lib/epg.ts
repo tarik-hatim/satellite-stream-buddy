@@ -144,11 +144,20 @@ export function zoneFile(zone: string): string {
 }
 
 const PW_LABEL: Record<string, string> = { FR: "France", GB: "United Kingdom", RU: "Russia", DE: "Germany", BR: "Brazil", US: "USA" };
+const EXTRA_FLAG: Record<string, string> = { Russia: "🇷🇺", Qatar: "🇶🇦", Morocco: "🇲🇦" };
+/** Country label with flag, identical whatever the guide source (epgshare01 / open-epg / epg.pw). */
 export function zoneLabel(zone: string): string {
   if (ZONES[zone]) return `${ZONES[zone]!.flag} ${ZONES[zone]!.label}`;
-  if (zone.startsWith("PW_")) return PW_LABEL[zone.slice(3)] ?? zone.slice(3);
-  const c = zone.replace(/^OE_/, "").replace(/\d+$/, "").replace(/([a-z])(arabia|kingdom)/, "$1 $2");
-  return c.charAt(0).toUpperCase() + c.slice(1);
+  let name: string;
+  if (zone.startsWith("PW_")) name = PW_LABEL[zone.slice(3)] ?? zone.slice(3);
+  else {
+    const c = zone.replace(/^OE_/, "").replace(/\d+$/, "").replace(/([a-z])(arabia|kingdom|states)/, "$1 $2");
+    name = c.replace(/\b\p{L}/gu, (x) => x.toUpperCase());
+  }
+  if (name === "USA" || name === "United States") name = "USA";
+  const known = Object.values(ZONES).find((z) => z.label.toLowerCase() === name.toLowerCase());
+  const flag = known?.flag ?? EXTRA_FLAG[name];
+  return flag ? `${flag} ${known?.label ?? name}` : name;
 }
 
 async function fetchZone(zone: string): Promise<string> {
