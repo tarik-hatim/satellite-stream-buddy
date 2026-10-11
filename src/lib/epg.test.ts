@@ -20,3 +20,12 @@ describe("guide sources", () => {
     expect(zoneFile("PW_GB")).toBe("pw:epg_GB.xml.gz");
   });
 });
+
+describe("attribute order", () => {
+  it("parses programmes whose channel attribute comes first", () => {
+    const now = new Date(); const p = (d: Date) => d.toISOString().replace(/[-:T]/g, "").slice(0, 14) + " +0000";
+    const a = new Date(now.getTime() - 3600_000), b = new Date(now.getTime() + 3600_000);
+    const xml = `<channel id="9"><display-name>Kanshi</display-name></channel><programme channel="9" start="${p(a)}" stop="${p(b)}"><title>Show</title></programme>`;
+    expect(parseXmltv(xml, "PW_GB")["kanshi"]?.p[0]?.title).toBe("Show");
+  });
+});

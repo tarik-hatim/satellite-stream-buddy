@@ -111,12 +111,14 @@ export function parseXmltv(xml: string, zone: string, wanted?: Set<string>): Epg
   }
   const from = new Date().setHours(0, 0, 0, 0) - DAY, to = from + 8 * DAY;
   const out: EpgIndex = {};
-  for (const m of xml.matchAll(/<programme start="([^"]+)" stop="([^"]+)" channel="([^"]+)"[^>]*>([\s\S]*?)<\/programme>/g)) {
-    const ns = idToNames.get(m[3]!);
+  // Attribute order differs between sources (epg.pw puts channel first).
+  for (const m of xml.matchAll(/<programme\b([^>]*)>([\s\S]*?)<\/programme>/g)) {
+    const attr = (k: string) => m[1]!.match(new RegExp(`\\b${k}="([^"]+)"`))?.[1];
+    const ns = idToNames.get(attr("channel") ?? "");
     if (!ns) continue;
-    const start = parseTime(m[1]!), stop = parseTime(m[2]!);
+    const start = parseTime(attr("start") ?? ""), stop = parseTime(attr("stop") ?? "");
     if (stop < from || start > to) continue;
-    const body = m[4]!;
+    const body = m[2]!;
     const title = body.match(/<title[^>]*>([^<]*)</)?.[1];
     if (!title) continue;
     const desc = body.match(/<desc[^>]*>([^<]*)</)?.[1];
