@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from "react";
-import { SATELLITES, formatPosition } from "@/lib/satellites";
+import { SATELLITES, formatPosition, shortName } from "@/lib/satellites";
 import { CHANNEL_LANGS, DICTS, LANGS, LANG_NAMES, isRtl, type FullDict, type Lang } from "@/lib/i18n";
 import { filterChannels, importChmax, loadCatalog, type Channel } from "@/lib/catalog";
 import { ZONES, zoneLabel, cachedZones, dayRange, inRange, loadZone, normName, nowNext, type EpgChannel, type EpgIndex, type Programme } from "@/lib/epg";
@@ -344,10 +344,10 @@ function Index() {
 
           <h3 className="mt-5 font-semibold">{t.satellites}</h3>
           <p className="text-xs text-muted-foreground">{t.satellitesHint}</p>
-          <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <div className="mt-2 grid grid-cols-2 gap-2">
             {SATELLITES.map((s) => (
-              <button key={s.index} data-nav data-on={settings.satellites.includes(s.index)} onClick={() => toggleSat(s.index)} className="chip justify-between">
-                <span>{s.name}</span><span className="font-semibold">{formatPosition(s.position)}</span>
+              <button key={s.index} data-nav data-on={settings.satellites.includes(s.index)} onClick={() => toggleSat(s.index)} className="chip min-h-11 h-auto justify-between gap-1 whitespace-normal px-2.5 py-2 text-start text-xs leading-snug">
+                <span className="min-w-0 break-words">{shortName(s.name)}</span><span className="ms-1 shrink-0 font-semibold">{formatPosition(s.position)}</span>
               </button>
             ))}
           </div>
