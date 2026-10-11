@@ -15,3 +15,4 @@
 - Keep advanced filters in a single scoped modal with collapsible groups; results stay visible on the main screen and remote focus cannot escape the panel.
 - Programme artwork comes from XMLTV programme icons with versioned guide caches; show an explicit unavailable state instead of fabricated posters.
 - Catalog rows are deduplicated per (channel name, bouquet/provider, satellite footprint group) and carry their own guide zone chosen from that footprint + audio language; the guide is looked up by zone+name because the same channel name on different footprints (e.g. beIN on Astra vs Nilesat/Badr) is a different feed.
+- Guide zones are source-prefixed (plain = epgshare01, OE_ = open-epg.com, PW_ = epg.pw) and fetched through the allowlisted /api/public/epg relay; channels whose footprint region has no guide in any source are dropped at catalog build.

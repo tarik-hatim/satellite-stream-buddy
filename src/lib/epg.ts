@@ -75,7 +75,7 @@ export const DEFAULT_ZONES: Record<Region, string[]> = {
 };
 const TTL = 6 * 3600_000;
 const DAY = 86_400_000;
-const CACHE_VERSION = 3;
+const CACHE_VERSION = 4;
 
 export function programmeImage(raw: string | undefined): string | undefined {
   if (!raw) return undefined;
@@ -111,12 +111,14 @@ export function parseXmltv(xml: string, zone: string, wanted?: Set<string>): Epg
   }
   const from = new Date().setHours(0, 0, 0, 0) - DAY, to = from + 8 * DAY;
   const out: EpgIndex = {};
-  for (const m of xml.matchAll(/<programme start="([^"]+)" stop="([^"]+)" channel="([^"]+)"[^>]*>([\s\S]*?)<\/programme>/g)) {
-    const ns = idToNames.get(m[3]!);
+  // Attribute order differs between sources (epg.pw puts channel first).
+  for (const m of xml.matchAll(/<programme\b([^>]*)>([\s\S]*?)<\/programme>/g)) {
+    const attr = (k: string) => m[1]!.match(new RegExp(`\\b${k}="([^"]+)"`))?.[1];
+    const ns = idToNames.get(attr("channel") ?? "");
     if (!ns) continue;
-    const start = parseTime(m[1]!), stop = parseTime(m[2]!);
+    const start = parseTime(attr("start") ?? ""), stop = parseTime(attr("stop") ?? "");
     if (stop < from || start > to) continue;
-    const body = m[4]!;
+    const body = m[2]!;
     const title = body.match(/<title[^>]*>([^<]*)</)?.[1];
     if (!title) continue;
     const desc = body.match(/<desc[^>]*>([^<]*)</)?.[1];
@@ -134,8 +136,23 @@ export function parseXmltv(xml: string, zone: string, wanted?: Set<string>): Epg
   return out;
 }
 
+/** Zone ids: "FR1" = epgshare01, "OE_turkey1" = open-epg.com, "PW_FR" = epg.pw. */
+export function zoneFile(zone: string): string {
+  if (zone.startsWith("OE_")) return `oe:${zone.slice(3)}.xml`;
+  if (zone.startsWith("PW_")) return `pw:epg_${zone.slice(3)}.xml.gz`;
+  return `epg_ripper_${zone}.xml.gz`;
+}
+
+const PW_LABEL: Record<string, string> = { FR: "France", GB: "United Kingdom", RU: "Russia", DE: "Germany", BR: "Brazil", US: "USA" };
+export function zoneLabel(zone: string): string {
+  if (ZONES[zone]) return `${ZONES[zone]!.flag} ${ZONES[zone]!.label}`;
+  if (zone.startsWith("PW_")) return PW_LABEL[zone.slice(3)] ?? zone.slice(3);
+  const c = zone.replace(/^OE_/, "").replace(/\d+$/, "").replace(/([a-z])(arabia|kingdom)/, "$1 $2");
+  return c.charAt(0).toUpperCase() + c.slice(1);
+}
+
 async function fetchZone(zone: string): Promise<string> {
-  const res = await fetch(`/api/public/epg?file=epg_ripper_${zone}.xml.gz`);
+  const res = await fetch(`/api/public/epg?file=${encodeURIComponent(zoneFile(zone))}`);
   if (!res.ok) throw new Error(`EPG ${res.status}`);
   const buf = new Uint8Array(await res.arrayBuffer());
   const gz = buf[0] === 0x1f && buf[1] === 0x8b;

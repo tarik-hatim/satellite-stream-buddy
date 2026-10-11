@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, ty
 import { SATELLITES, formatPosition } from "@/lib/satellites";
 import { CHANNEL_LANGS, DICTS, LANGS, LANG_NAMES, isRtl, type FullDict, type Lang } from "@/lib/i18n";
 import { filterChannels, importChmax, loadCatalog, type Channel } from "@/lib/catalog";
-import { ZONES, cachedZones, dayRange, inRange, loadZone, normName, nowNext, type EpgChannel, type EpgIndex, type Programme } from "@/lib/epg";
+import { ZONES, zoneLabel, cachedZones, dayRange, inRange, loadZone, normName, nowNext, type EpgChannel, type EpgIndex, type Programme } from "@/lib/epg";
 import { CATEGORY_ICON, CATEGORY_LABEL, categorize, type Category } from "@/lib/categories";
 import { useSettings } from "@/lib/settings";
 import { useFavorites, useReminders, reminderKey, type Reminder } from "@/lib/prefs";
@@ -281,7 +281,7 @@ function Index() {
             <FilterRow label={t.bouquet} all={t.all} total={base.length} value={bouquet} onChange={setBouquet}
               items={counts.bouquet.map(([k, n]) => [k, k, n])} />
             <FilterRow label={`🌐 ${t.zone}`} all={`🌍 ${t.all}`} total={base.length} value={zone} onChange={setZone}
-              items={counts.zone.map(([k, n]) => [k, `${ZONES[k]?.flag ?? ""} ${ZONES[k]?.label ?? k}`, n])} />
+              items={counts.zone.map(([k, n]) => [k, zoneLabel(k), n])} />
             <FilterRow label={`✦ ${t.genre}`} all={t.allGenres} total={base.length} value={genre} onChange={setGenre}
               items={counts.genre.map(([k, n]) => [k, k, n])} />
 
@@ -536,7 +536,7 @@ function ChannelDetail({ c, g, progs, now, t, lang, fav, onFav, onClose, hasRem,
       </div>
 
       <p className="mt-3 text-xs text-muted-foreground">
-        {t.frequency}: {c.freq} {c.pol} {c.sr}{c.langs.length > 0 && ` · ${t.audio}: ${c.langs.join(" + ").toUpperCase()}`}{g && ` · ${ZONES[g.z]?.flag ?? ""} ${ZONES[g.z]?.label ?? g.z}`}
+        {t.frequency}: {c.freq} {c.pol} {c.sr}{c.langs.length > 0 && ` · ${t.audio}: ${c.langs.join(" + ").toUpperCase()}`}{g && ` · ${zoneLabel(g.z)}`}
       </p>
 
       {focus ? (
