@@ -75,7 +75,7 @@ export const DEFAULT_ZONES: Record<Region, string[]> = {
 };
 const TTL = 6 * 3600_000;
 const DAY = 86_400_000;
-const CACHE_VERSION = 3;
+const CACHE_VERSION = 4;
 
 export function programmeImage(raw: string | undefined): string | undefined {
   if (!raw) return undefined;
