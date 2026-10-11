@@ -3,7 +3,7 @@ import type { Region } from "./region";
 
 export interface Programme { start: number; stop: number; title: string; desc?: string; cat?: string; img?: string }
 export interface EpgChannel { z: string; p: Programme[] }
-/** key = normalised channel name */
+/** key = normalised channel name, or "ZONE|name" for a bouquet-specific feed */
 export type EpgIndex = Record<string, EpgChannel>;
 
 /** epgshare01 zones (country / network files). */
@@ -156,7 +156,7 @@ export async function cachedZones(zones: string[]): Promise<EpgIndex> {
   const out: EpgIndex = {};
   for (const z of zones) {
     const c = await idbGet<{ data: EpgIndex }>(`epgz:${z}`);
-    if (c) for (const k in c.data) out[k] ??= c.data[k]!;
+    if (c) for (const k in c.data) { out[`${z}|${k}`] = c.data[k]!; out[k] ??= c.data[k]!; }
   }
   return out;
 }

@@ -101,7 +101,7 @@ function Index() {
         try {
           const d = await loadZone(zone, wanted, force);
           ok++;
-          setEpg((p) => { const n = { ...p }; for (const k in d) { const entry = d[k]; if (entry && (!n[k] || n[k]?.z === zone)) n[k] = entry; } return n; });
+          setEpg((p) => { const n = { ...p }; for (const k in d) { const entry = d[k]; if (!entry) continue; n[`${zone}|${k}`] = entry; if (!n[k] || n[k]?.z === zone) n[k] = entry; } return n; });
         } catch { /* zone unreachable */ }
       }
     };
@@ -141,7 +141,7 @@ function Index() {
   }, [selected, filtersOpen]);
 
   const range = useMemo(() => dayRange(day), [day, Math.floor(now / 3600_000)]);
-  const guideOf = useCallback((c: Channel): EpgChannel | undefined => epg[normName(c.name)], [epg]);
+  const guideOf = useCallback((c: Channel): EpgChannel | undefined => (c.zone ? epg[`${c.zone}|${normName(c.name)}`] : undefined) ?? epg[normName(c.name)], [epg]);
 
   // Base list: satellites enabled in settings + search + TV/radio + language + free
   const base = useMemo(() => {
