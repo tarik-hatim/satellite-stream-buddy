@@ -13,19 +13,21 @@ export interface Channel {
   freq: string;
   pol: string;
   sr: string;
+  /** epgshare01 country file that carries this channel's guide (resolved at catalog build). */
+  zone?: string;
   /** Pre-lowercased name for fast search */
   key: string;
 }
 
-type Row = [string, string, number, string, number, string[], number[], string, string, string];
-const CACHE_KEY = "catalog:v3-guide";
+type Row = [string, string, number, string, number, string[], number[], string, string, string, string?];
+const CACHE_KEY = "catalog:v4-clean";
 
 function fromRows(rows: Row[]): Channel[] {
-  return rows.map(([id, name, tv, provider, ca, langs, sats, freq, pol, sr]) => ({
+  return rows.map(([id, name, tv, provider, ca, langs, sats, freq, pol, sr, zone]) => ({
     id, name, tv: !!tv, provider, ca: !!ca,
     langs: [...new Set(langs.map(normalizeAudioLang).filter((x): x is string => !!x))],
     satMask: sats.reduce((m, i) => m | (1 << i), 0),
-    freq, pol, sr, key: name.toLowerCase(),
+    freq, pol, sr, key: name.toLowerCase(), ...(zone ? { zone } : {}),
   }));
 }
 

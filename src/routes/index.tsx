@@ -65,7 +65,7 @@ function Index() {
   const [zone, setZone] = useState<string | null>(null);
   const [genre, setGenre] = useState<string | null>(null);
   const [day, setDay] = useState(0);
-  const [onlyGuide, setOnlyGuide] = useState(false);
+  const [onlyGuide, setOnlyGuide] = useState(true);
   const [limit, setLimit] = useState(PAGE);
   const [panel, setPanel] = useState<"settings" | "exit" | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -84,14 +84,17 @@ function Index() {
     document.documentElement.dir = isRtl(lang) ? "rtl" : "ltr";
   }, [lang]);
 
-  const zonesKey = settings?.zones.join(",");
+  const zonesKey = `${settings?.zones.join(",")}|${settings?.satellites.join(",")}`;
   const fetchGuide = useCallback(async (force = false) => {
     if (!catalog || !settings) return;
     setEpgState("loading");
     const wanted = new Set(catalog.map((c) => normName(c.name)));
     let ok = 0;
     // Load 3 countries at a time: faster than one by one, still light on TV boxes.
-    const queue = [...settings.zones];
+    // Countries are derived from the channels on the chosen satellites — no manual picking needed.
+    const mask = settings.satellites.reduce((m, i) => m | (1 << i), 0);
+    const auto = new Set(catalog.filter((c) => c.zone && (c.satMask & mask)).map((c) => c.zone!));
+    const queue = [...new Set([...auto, ...settings.zones])];
     const worker = async () => {
       for (let z = queue.shift(); z; z = queue.shift()) {
         const zone = z;
@@ -110,7 +113,7 @@ function Index() {
   useEffect(() => {
     if (!catalog || !settings) return;
     setEpg({});
-    cachedZones(settings.zones).then((c) => { setEpg(c); void fetchGuide(); });
+    cachedZones([...new Set([...catalog.filter((c) => c.zone).map((c) => c.zone!), ...settings.zones])]).then((c) => { setEpg(c); void fetchGuide(); });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [catalog, zonesKey]);
 
