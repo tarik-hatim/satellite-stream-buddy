@@ -265,9 +265,6 @@ function Index() {
                 <h2 className="text-lg font-bold">{ux.filters} {activeFilters > 0 && <span className="text-primary">· {activeFilters}</span>}</h2>
                 <Button data-nav autoFocus size="icon" variant="ghost" aria-label={t.close} onClick={() => setFiltersOpen(false)}><X /></Button>
               </div>
-              <div className="my-3 flex gap-2">
-                {([[true, t.tv], [false, t.radio], [null, t.all]] as const).map(([v, label]) => <Button key={String(v)} data-nav variant={tv === v ? "default" : "outline"} aria-pressed={tv === v} onClick={() => setTv(v)} className="h-11 flex-1">{label}</Button>)}
-              </div>
             <FilterRow label={`🎞 ${t.category}`} all={t.all} total={base.length} value={cat} onChange={setCat}
               items={counts.cat.map(([k, n]) => [k, `${CATEGORY_ICON[k]} ${cl?.[k] ?? k}`, n])} />
             <FilterRow label={`🛰 ${t.sat}`} all={t.all} total={base.length} value={sat} onChange={setSat}
