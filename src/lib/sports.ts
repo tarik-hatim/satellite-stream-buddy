@@ -21,7 +21,7 @@ export function parseMatch(title: string): MatchInfo | null {
   return { home, away };
 }
 
-export const isReplay = (title: string) => REPLAY.test(title.normalize("NFD").replace(/[\u0300-\u036f]/g, ""));
+export const isReplay = (title: string) => REPLAY.test(title) || REPLAY.test(title.normalize("NFD").replace(/[\u0300-\u036f]/g, ""));
 
 /** Grouping key: same match on different channels (order-insensitive, ±30 min tolerance via hour bucket). */
 export function eventKey(title: string, start: number): string {
