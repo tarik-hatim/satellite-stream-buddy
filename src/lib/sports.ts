@@ -1,7 +1,7 @@
 /** Multilingual match detection + cross-channel grouping for the Sport tab. */
 const PREFIX = /^\s*(?:live|en direct|direct|directo|en vivo|ao vivo|live:|canlı|مباشر|بث مباشر|القمة)\s*[:\-–|]?\s*/i;
 const SEP = /\s+(?:vs\.?|v\.?|versus|contre|gegen|contra|x|×|-|–|—|ضد|أمام|مع)\s+/i;
-const REPLAY = /\b(?:rediff\w*|replay|r[ée]sum[ée]|highlights?|best of|magazine|repetici[oó]n|resumen|melhores momentos|tekrar|özet|wiederholung|zusammenfassung)\b|إعادة|ملخص/i;
+const REPLAY = /\b(?:rediff\w*|replay|resume|highlights?|best of|magazine|repeticion|resumen|melhores momentos|tekrar|ozet|wiederholung|zusammenfassung)\b|إعادة|ملخص/i;
 
 const norm = (s: string) =>
   s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
