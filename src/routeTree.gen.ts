@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiPublicEpgRouteImport } from './routes/api/public/epg'
+import { Route as ApiPublicYtRouteImport } from './routes/api/public/yt'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -22,31 +23,40 @@ const ApiPublicEpgRoute = ApiPublicEpgRouteImport.update({
   path: '/api/public/epg',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicYtRoute = ApiPublicYtRouteImport.update({
+  id: '/api/public/yt',
+  path: '/api/public/yt',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/api/public/epg': typeof ApiPublicEpgRoute
+  '/api/public/yt': typeof ApiPublicYtRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/api/public/epg': typeof ApiPublicEpgRoute
+  '/api/public/yt': typeof ApiPublicYtRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/api/public/epg': typeof ApiPublicEpgRoute
+  '/api/public/yt': typeof ApiPublicYtRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/public/epg'
+  fullPaths: '/' | '/api/public/epg' | '/api/public/yt'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/public/epg'
-  id: '__root__' | '/' | '/api/public/epg'
+  to: '/' | '/api/public/epg' | '/api/public/yt'
+  id: '__root__' | '/' | '/api/public/epg' | '/api/public/yt'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ApiPublicEpgRoute: typeof ApiPublicEpgRoute
+  ApiPublicYtRoute: typeof ApiPublicYtRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -65,12 +75,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicEpgRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/yt': {
+      id: '/api/public/yt'
+      path: '/api/public/yt'
+      fullPath: '/api/public/yt'
+      preLoaderRoute: typeof ApiPublicYtRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ApiPublicEpgRoute: ApiPublicEpgRoute,
+  ApiPublicYtRoute: ApiPublicYtRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
