@@ -249,7 +249,7 @@ function Index() {
       </nav>
 
       {tab === "sports" ? (
-        <SportsView channels={catalog ? filterChannels(catalog, { satellites: settings.satellites, tv: null, lang: null, freeOnly: false, query: "" }) : []} guideOf={guideOf} now={now} lang={lang} onOpen={setSelected} />
+        <SportsView channels={catalog ? filterChannels(catalog, { satellites: settings.satellites, tv: null, lang: null, freeOnly: false, query: "" }) : []} guideOf={guideOf} now={now} lang={lang} onOpen={setSelected} hasRem={hasRem} toggleRem={toggleRem} />
       ) : tab === "reminders" ? (
         <RemindersView reminders={reminders} t={t} lang={lang} onRemove={toggleRem} now={now} />
       ) : (
