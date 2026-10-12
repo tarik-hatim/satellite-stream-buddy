@@ -1,7 +1,7 @@
 export type Category = "sport" | "movies" | "news" | "kids" | "music" | "docs" | "other";
 
 const RULES: [Category, RegExp][] = [
-  ["sport", /sport|foot|soccer|match|ligue|liga|league|tennis|basket|rugby|f1|moto|رياض|كرة|spor|futebol|fútbol|deporte/i],
+  ["sport", /sport|ποδόσφαιρο|μπάσκετ|piłka|mecz|maraton|athlet|boxe|boxing|cyclisme|ufc|nba|nfl|calcio|serie a|bundesliga|premier league|champions|botola|foot|soccer|match|ligue|liga|league|tennis|basket|rugby|f1|moto|رياض|كرة|spor|futebol|fútbol|deporte/i],
   ["movies", /film|movie|cin[eé]|s[ée]rie|series|drama|thriller|com[eé]d|أفلام|فيلم|مسلسل|dizi|filme|película/i],
   ["news", /news|info|journal|actualit|nachricht|noticia|notícia|أخبار|haber|jt\b|politi|m[ée]t[ée]o|weather/i],
   ["kids", /kid|enfant|jeunesse|cartoon|anim|child|kinder|infantil|أطفال|çocuk|niños/i],
