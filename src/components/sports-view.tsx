@@ -4,6 +4,7 @@ import type { EpgChannel, Programme } from "@/lib/epg";
 import { categorize } from "@/lib/categories";
 import { eventKey, isReplay, parseMatch } from "@/lib/sports";
 import type { Lang } from "@/lib/i18n";
+import { reminderKey, type Reminder } from "@/lib/prefs";
 
 const COPY: Record<Lang, { live: string; soon: string; free: string; paid: string; freeOnly: string; matches: string; none: string; channels: string }> = {
   fr: { live: "En direct", soon: "Prochainement", free: "En clair", paid: "Crypté", freeOnly: "En clair seulement", matches: "Matchs", none: "Aucun événement sportif trouvé dans le guide.", channels: "chaînes" },
@@ -17,9 +18,11 @@ const COPY: Record<Lang, { live: string; soon: string; free: string; paid: strin
 
 interface Event { key: string; p: Programme; match: boolean; airings: Channel[] }
 
-export function SportsView({ channels, guideOf, now, lang, onOpen }: {
+export function SportsView({ channels, guideOf, now, lang, onOpen, hasRem, toggleRem }: {
   channels: Channel[]; guideOf: (c: Channel) => EpgChannel | undefined; now: number; lang: Lang; onOpen: (c: Channel) => void;
+  hasRem: (k: string) => boolean; toggleRem: (r: Reminder) => void;
 }) {
+  const [view, setView] = useState<"live" | "soon">("live");
   const t = COPY[lang];
   const [freeOnly, setFreeOnly] = useState(false);
   const [matchOnly, setMatchOnly] = useState(true);
@@ -57,7 +60,11 @@ export function SportsView({ channels, guideOf, now, lang, onOpen }: {
       <article className="rounded-xl border border-border bg-card p-3">
         <div className="flex items-center justify-between gap-2 text-xs">
           <span className={isLive ? "font-bold text-primary" : "text-muted-foreground"}>{isLive ? `● ${t.live}` : fmt(e.p.start)} – {fmt(e.p.stop)}</span>
-          {e.p.cat && <span className="truncate text-muted-foreground">{e.p.cat}</span>}
+          <span className="flex items-center gap-2">
+            {e.p.cat && <span className="truncate text-muted-foreground">{e.p.cat}</span>}
+            {!isLive && (() => { const c = e.airings[0]!; const r = { key: reminderKey(c.name, e.p.start), channel: c.name, title: e.p.title, start: e.p.start }; const on = hasRem(r.key);
+              return <button data-nav data-on={on} onClick={() => toggleRem(r)} aria-label="🔔" className="chip h-8 min-h-8 px-2 text-xs">🔔{on ? " ✓" : ""}</button>; })()}
+          </span>
         </div>
         <h3 className="mt-1 font-semibold leading-snug">{e.p.title}</h3>
         {isLive && <div className="mt-2 h-1 overflow-hidden rounded bg-secondary"><div className="h-full bg-primary" style={{ width: `${pct}%` }} /></div>}
@@ -77,12 +84,13 @@ export function SportsView({ channels, guideOf, now, lang, onOpen }: {
   return (
     <section className="space-y-3">
       <div className="flex flex-wrap gap-2">
+        <button data-nav data-on={view === "live"} onClick={() => setView("live")} className="chip text-sm">● {t.live} · {live.length}</button>
+        <button data-nav data-on={view === "soon"} onClick={() => setView("soon")} className="chip text-sm">🕒 {t.soon} (24h) · {soon.length}</button>
         <button data-nav data-on={matchOnly} onClick={() => setMatchOnly((v) => !v)} className="chip text-sm">⚽ {t.matches}</button>
         <button data-nav data-on={freeOnly} onClick={() => setFreeOnly((v) => !v)} className="chip text-sm">🔓 {t.freeOnly}</button>
       </div>
       {!shown.length && <p className="py-16 text-center text-muted-foreground">{t.none}</p>}
-      {live.length > 0 && <><h2 className="text-sm font-bold text-primary">{t.live} · {live.length}</h2><div className="grid gap-2 md:grid-cols-2">{live.map((e) => <Card key={e.key} e={e} />)}</div></>}
-      {soon.length > 0 && <><h2 className="text-sm font-bold text-muted-foreground">{t.soon} · {soon.length}</h2><div className="grid gap-2 md:grid-cols-2">{soon.slice(0, 60).map((e) => <Card key={e.key} e={e} />)}</div></>}
+      {shown.length > 0 && <div className="grid gap-2 md:grid-cols-2">{(view === "live" ? live : soon.slice(0, 80)).map((e) => <Card key={e.key} e={e} />)}</div>}
     </section>
   );
 }
