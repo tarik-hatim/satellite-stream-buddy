@@ -17,6 +17,7 @@ const COPY: Record<Lang, { live: string; soon: string; free: string; paid: strin
 };
 
 const HL: Record<Lang, string> = {fr: "résumé", en: "highlights", ar: "ملخص", es: "resumen", pt: "melhores momentos", de: "highlights", tr: "özet"};
+const SPORT_CH = /sport|bein|ssc|eurosport|arena|espn|dazn|novasport|tivibu|kass|ad sports|abu dhabi sports|dubai sports|arryadia|setanta|sky sport|movistar (?:liga|deportes)|nova sport/i;
 interface Event { key: string; p: Programme; match: boolean; airings: Channel[] }
 
 export function SportsView({ channels, guideOf, now, lang, onOpen, hasRem, toggleRem }: {
@@ -34,10 +35,10 @@ export function SportsView({ channels, guideOf, now, lang, onOpen, hasRem, toggl
     for (const c of channels) {
       for (const p of guideOf(c)?.p ?? []) {
         if (p.stop <= now - 24 * 3600_000 || p.start > horizon) continue;
-        if (p.stop <= now && !parseMatch(p.title)) continue;
+        
+        const sporty = categorize(`${p.cat ?? ""} ${p.title}`) === "sport" || (SPORT_CH.test(c.name) && (!p.cat || categorize(p.cat) === "other"));
+        if (!sporty || isReplay(p.title)) continue;
         const match = !!parseMatch(p.title);
-        if (!match && (isReplay(p.title) || categorize(`${p.cat ?? ""} ${p.title}`) !== "sport")) continue;
-        if (match && p.cat && categorize(p.cat) !== "sport" && categorize(p.cat) !== "other") continue;
         const key = eventKey(p.title, p.start);
         const e = map.get(key) ?? { key, p, match, airings: [] };
         if (!e.airings.some((x) => x.id === c.id)) e.airings.push(c);
