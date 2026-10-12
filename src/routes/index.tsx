@@ -11,6 +11,7 @@ import { moveFocus } from "@/lib/dpad";
 import { Button } from "@/components/ui/button";
 import { SlidersHorizontal, X, RotateCcw, ChevronDown } from "lucide-react";
 import { ProgrammePoster } from "@/components/programme-poster";
+import { SportsView } from "@/components/sports-view";
 import { useDeviceMode, type DeviceMode } from "@/lib/device";
 import { UX_COPY } from "@/lib/ux-copy";
 
@@ -28,7 +29,7 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
-type Tab = "live" | "grid" | "favorites" | "reminders";
+type Tab = "live" | "sports" | "grid" | "favorites" | "reminders";
 type Slot = "all" | "morning" | "afternoon" | "evening" | "night";
 const PAGE = 40;
 const SLOTS: Record<Exclude<Slot, "all">, [number, number]> = { morning: [5, 12], afternoon: [12, 18], evening: [18, 24], night: [0, 5] };
@@ -204,7 +205,7 @@ function Index() {
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const off = -new Date().getTimezoneOffset() / 60;
   const tabs: [Tab, string, string][] = [
-    ["live", "●", t.liveNow], ["grid", "▦", t.grid], ["favorites", "♡", t.favorites], ["reminders", "🔔", `${t.remindMe.split(" ")[0]} ${reminders.length || ""}`],
+    ["live", "●", t.liveNow], ["sports", "⚽", ({ fr: "Sport", en: "Sports", ar: "رياضة", es: "Deportes", pt: "Esportes", de: "Sport", tr: "Spor" } as Record<string, string>)[lang] ?? "Sports"], ["grid", "▦", t.grid], ["favorites", "♡", t.favorites], ["reminders", "🔔", `${t.remindMe.split(" ")[0]} ${reminders.length || ""}`],
   ];
   const sats = SATELLITES.filter((s) => settings.satellites.includes(s.index));
   const activeFilters = [cat, sat, bouquet, zone, genre, settings.channelLang].filter((v) => v !== null).length + Number(tv !== true) + Number(settings.freeOnly);
@@ -247,7 +248,9 @@ function Index() {
         ))}
       </nav>
 
-      {tab === "reminders" ? (
+      {tab === "sports" ? (
+        <SportsView channels={catalog ? filterChannels(catalog, { satellites: settings.satellites, tv: null, lang: null, freeOnly: false, query: "" }) : []} guideOf={guideOf} now={now} lang={lang} onOpen={setSelected} />
+      ) : tab === "reminders" ? (
         <RemindersView reminders={reminders} t={t} lang={lang} onRemove={toggleRem} now={now} />
       ) : (
         <>
