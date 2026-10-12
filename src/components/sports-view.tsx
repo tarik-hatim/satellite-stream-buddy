@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import type { Channel } from "@/lib/catalog";
 import type { EpgChannel, Programme } from "@/lib/epg";
 import { categorize } from "@/lib/categories";
+import { eventKey, isReplay, parseMatch } from "@/lib/sports";
 import type { Lang } from "@/lib/i18n";
 
 const COPY: Record<Lang, { live: string; soon: string; free: string; paid: string; freeOnly: string; matches: string; none: string; channels: string }> = {
@@ -14,7 +15,6 @@ const COPY: Record<Lang, { live: string; soon: string; free: string; paid: strin
   tr: { live: "Şimdi canlı", soon: "Yakında", free: "Şifresiz", paid: "Şifreli", freeOnly: "Sadece şifresiz", matches: "Maçlar", none: "Rehberde spor etkinliği yok.", channels: "kanal" },
 };
 
-const MATCH = /\s(?:vs\.?|v\.?|-|–|x|×|ضد)\s/i;
 interface Event { key: string; p: Programme; match: boolean; airings: Channel[] }
 
 export function SportsView({ channels, guideOf, now, lang, onOpen }: {
@@ -30,9 +30,11 @@ export function SportsView({ channels, guideOf, now, lang, onOpen }: {
     for (const c of channels) {
       for (const p of guideOf(c)?.p ?? []) {
         if (p.stop <= now || p.start > horizon) continue;
-        if (categorize(`${p.cat ?? ""} ${p.title}`) !== "sport") continue;
-        const key = `${p.title.toLowerCase().replace(/\s+/g, " ").trim()}|${Math.round(p.start / 900_000)}`;
-        const e = map.get(key) ?? { key, p, match: MATCH.test(p.title), airings: [] };
+        const match = !!parseMatch(p.title);
+        if (!match && (isReplay(p.title) || categorize(`${p.cat ?? ""} ${p.title}`) !== "sport")) continue;
+        if (match && p.cat && categorize(p.cat) !== "sport" && categorize(p.cat) !== "other") continue;
+        const key = eventKey(p.title, p.start);
+        const e = map.get(key) ?? { key, p, match, airings: [] };
         if (!e.airings.some((x) => x.id === c.id)) e.airings.push(c);
         map.set(key, e);
       }
