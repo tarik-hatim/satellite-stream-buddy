@@ -1,20 +1,6 @@
 /** Official highlight finder: reads the public YouTube RSS feeds of official league/broadcaster channels
  * (no API key, no quota) and scores each video against a finished match. Browser-safe. */
-export const OFFICIAL_CHANNELS: Record<string, string> = {
-  UCTv_XvfzLX3i4IGWAm4sbmA: "LaLiga",
-  UCG5qGWdu8nIRZqJ_GgDwQ_w: "Premier League",
-  UCBJeMCIeLQos7wacox4hmLQ: "Serie A",
-  UC6UL29enLNe4mqwTfAyeNuw: "Bundesliga",
-  UCyGa1YEx9ST66rYrJTGIKOw: "UEFA",
-  UCJUCcJUeh0Cz2xyKwkw5Q1w: "beIN SPORTS",
-  UCfj4kQ6_mYO5r4hzX5KloVw: "beIN SPORTS France",
-  UC_ZMGMdEVWKGWhwMaWKP4Xg: "FRMF",
-  UCshfmlozZdHI8cHajMkCLyA: "CAF",
-  UCfYNqluOf8EbQkL44otydMw: "TRT Spor",
-  UC6c1z7bA__85CIWZ_jpCK_Q: "ESPN FC",
-  UCZ7wY7MRDSygp63HIEfdQZA: "Sky Sports Football",
-};
-// Real ids contain "-" — stored with "_" above only where they differ is error-prone, so keep exact ids here:
+/** Allowlisted official channels (league / federation / broadcaster). */
 export const CHANNEL_IDS = [
   "UCTv-XvfzLX3i4IGWAm4sbmA", "UCG5qGWdu8nIRZqJ_GgDwQ-w", "UCBJeMCIeLQos7wacox4hmLQ", "UC6UL29enLNe4mqwTfAyeNuw",
   "UCyGa1YEx9ST66rYrJTGIKOw", "UCJUCcJUeh0Cz2xyKwkw5Q1w", "UCfj4kQ6_mYO5r4hzX5KloVw", "UC_ZMGMdEVWKGWhwMaWKP4Xg",
