@@ -12,7 +12,7 @@ export interface MatchInfo { home: string; away: string }
 
 /** Returns the two teams if the title looks like a live match (not a replay/recap). */
 export function parseMatch(title: string): MatchInfo | null {
-  if (REPLAY.test(title)) return null;
+  if (isReplay(title)) return null;
   const t = title.replace(PREFIX, "").split(/\s*[|:]\s*(?=[^|:]*$)/)[0]!; // drop trailing ": Ligue 1" etc. only if after teams
   const parts = (SEP.test(t) ? t : title.replace(PREFIX, "")).split(SEP);
   if (parts.length !== 2) return null;
@@ -21,7 +21,7 @@ export function parseMatch(title: string): MatchInfo | null {
   return { home, away };
 }
 
-export const isReplay = (title: string) => REPLAY.test(title);
+export const isReplay = (title: string) => REPLAY.test(title.normalize("NFD").replace(/[\u0300-\u036f]/g, ""));
 
 /** Grouping key: same match on different channels (order-insensitive, ±30 min tolerance via hour bucket). */
 export function eventKey(title: string, start: number): string {
