@@ -9,6 +9,12 @@ describe("sports match detection", () => {
     expect(parseMatch("الهلال ضد النصر")).not.toBeNull();
     expect(parseMatch("France contre Italie")).not.toBeNull();
   });
+  it("extracts teams from the last segment of prefixed guide titles", () => {
+    expect(parseMatch("EFL 26/27: West Ham Utd v QPR")).toEqual({ home: "west ham utd", away: "qpr" });
+    expect(parseMatch("Liga niemiecka - mecz: SC Freiburg - FC Schalke 04")).toEqual({ home: "freiburg", away: "schalke 04" });
+    expect(parseMatch("MNF: Coventry v Newcastle Hlts")).toEqual({ home: "coventry", away: "newcastle" });
+    expect(parseMatch("Classic Match : Everton - Liverpool (2007/08)")).toBeNull();
+  });
   it("rejects replays and recaps", () => {
     expect(parseMatch("Rediffusion : PSG vs Marseille")).toBeNull();
     expect(parseMatch("Résumé PSG - OM")).toBeNull();

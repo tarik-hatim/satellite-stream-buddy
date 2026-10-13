@@ -1,8 +1,9 @@
+import type React from "react";
 import { useMemo, useState } from "react";
 import type { Channel } from "@/lib/catalog";
 import type { EpgChannel, Programme } from "@/lib/epg";
 import { categorize } from "@/lib/categories";
-import { findHighlight, loadOfficialVideos, type Video } from "@/lib/highlights";
+import { highlightFor, type Video } from "@/lib/highlights";
 import { eventKey, isReplay, parseMatch } from "@/lib/sports";
 import type { Lang } from "@/lib/i18n";
 import { reminderKey, type Reminder } from "@/lib/prefs";
@@ -31,7 +32,7 @@ export function SportsView({ channels, guideOf, now, lang, onOpen, hasRem, toggl
     const q = `https://www.youtube.com/results?search_query=${encodeURIComponent(`${title} ${HL[lang]}`)}`;
     setPlayer({ title, v: null, q, busy: true });
     const m = parseMatch(e.p.title);
-    const v = m ? findHighlight(m.home, m.away, e.p.start, await loadOfficialVideos()) : null;
+    const v = m ? await highlightFor(m.home, m.away, e.p.start) : null;
     setPlayer({ title, v, q, busy: false });
   };
   const [view, setView] = useState<"live" | "soon" | "ended">("live");
@@ -72,12 +73,12 @@ export function SportsView({ channels, guideOf, now, lang, onOpen, hasRem, toggl
     const isEnded = e.p.stop <= now;
     const isLive = e.p.start <= now && !isEnded;
     return (
-      <article className="rounded-xl border border-border bg-card p-3">
+      <article {...(isEnded ? { role: "button", tabIndex: 0, "data-nav": true, onClick: () => void openSummary(e), onKeyDown: (k: React.KeyboardEvent) => { if (k.key === "Enter") void openSummary(e); } } : {})} className={`rounded-xl border border-border bg-card p-3 ${isEnded ? "cursor-pointer hover:border-primary" : ""}`}>
         <div className="flex items-center justify-between gap-2 text-xs">
           <span className={isLive ? "font-bold text-primary" : "text-muted-foreground"}>{isLive ? `● ${t.live}` : fmt(e.p.start)} – {fmt(e.p.stop)}</span>
           <span className="flex items-center gap-2">
             {e.p.cat && <span className="truncate text-muted-foreground">{e.p.cat}</span>}
-            {isEnded && <button data-nav onClick={() => void openSummary(e)} className="chip h-8 min-h-8 px-2 text-xs">▶ {t.summary}</button>}
+            {isEnded && <span className="chip h-8 min-h-8 px-2 text-xs">▶ {t.summary}</span>}
             {!isLive && !isEnded && (() => { const c = e.airings[0]!; const r = { key: reminderKey(c.name, e.p.start), channel: c.name, title: e.p.title, start: e.p.start }; const on = hasRem(r.key);
               return <button data-nav data-on={on} onClick={() => toggleRem(r)} aria-label="🔔" className="chip h-8 min-h-8 px-2 text-xs">🔔{on ? " ✓" : ""}</button>; })()}
           </span>
@@ -86,7 +87,7 @@ export function SportsView({ channels, guideOf, now, lang, onOpen, hasRem, toggl
         {isLive && <div className="mt-2 h-1 overflow-hidden rounded bg-secondary"><div className="h-full bg-primary" style={{ width: `${pct}%` }} /></div>}
         <div className="mt-2 flex flex-wrap gap-1.5">
           {e.airings.slice(0, 8).map((c) => (
-            <button key={c.id} data-nav onClick={() => onOpen(c)} className="chip h-auto min-h-9 gap-1 px-2 py-1 text-xs">
+            <button key={c.id} data-nav onClick={(ev) => { ev.stopPropagation(); onOpen(c); }} className="chip h-auto min-h-9 gap-1 px-2 py-1 text-xs">
               <span className={`size-2 rounded-full ${c.ca ? "bg-destructive" : "bg-primary"}`} aria-hidden />
               {c.name}<span className="text-muted-foreground">· {c.ca ? t.paid : t.free}</span>
             </button>
@@ -118,7 +119,7 @@ export function SportsView({ channels, guideOf, now, lang, onOpen, hasRem, toggl
                 <p className="text-xs text-muted-foreground">{player.v.channel} · {player.v.title}</p>
               </>
             ) : (
-              <p className="py-6 text-center text-sm text-muted-foreground">{t.noSummary} <a data-nav href={player.q} target="_blank" rel="noopener noreferrer" className="chip mt-3 inline-flex">YouTube ↗</a></p>
+              <p className="py-6 text-center text-sm text-muted-foreground">{t.noSummary}</p>
             )}
           </div>
         </div>
