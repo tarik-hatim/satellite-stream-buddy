@@ -8,14 +8,14 @@ import { eventKey, isReplay, parseMatch } from "@/lib/sports";
 import type { Lang } from "@/lib/i18n";
 import { reminderKey, type Reminder } from "@/lib/prefs";
 
-const COPY: Record<Lang, { live: string; soon: string; free: string; paid: string; freeOnly: string; matches: string; none: string; channels: string; ended: string; summary: string; noSummary: string }> = {
-  fr: { live: "En direct", soon: "Prochainement", free: "En clair", paid: "Crypté", freeOnly: "En clair seulement", matches: "Matchs", none: "Aucun événement sportif trouvé dans le guide.", channels: "chaînes", ended: "Terminés", summary: "Résumé", noSummary: "Pas encore de résumé officiel trouvé." },
-  en: { live: "Live now", soon: "Coming up", free: "Free-to-air", paid: "Encrypted", freeOnly: "Free-to-air only", matches: "Matches", none: "No sports events found in the guide.", channels: "channels", ended: "Finished", summary: "Highlights", noSummary: "No official highlights found yet." },
-  ar: { live: "مباشر الآن", soon: "قريبًا", free: "مفتوح", paid: "مشفر", freeOnly: "المفتوح فقط", matches: "مباريات", none: "لا توجد أحداث رياضية في الدليل.", channels: "قنوات", ended: "انتهت", summary: "الملخص", noSummary: "لم يتم العثور على ملخص رسمي بعد." },
-  es: { live: "En directo", soon: "Próximamente", free: "En abierto", paid: "Codificado", freeOnly: "Solo en abierto", matches: "Partidos", none: "No hay eventos deportivos en la guía.", channels: "canales", ended: "Finalizados", summary: "Resumen", noSummary: "Aún no hay resumen oficial." },
-  pt: { live: "Ao vivo", soon: "Em breve", free: "Aberto", paid: "Codificado", freeOnly: "Só abertos", matches: "Jogos", none: "Nenhum evento esportivo no guia.", channels: "canais", ended: "Encerrados", summary: "Melhores momentos", noSummary: "Ainda sem resumo oficial." },
-  de: { live: "Jetzt live", soon: "Demnächst", free: "Frei empfangbar", paid: "Verschlüsselt", freeOnly: "Nur frei", matches: "Spiele", none: "Keine Sportereignisse im Guide.", channels: "Sender", ended: "Beendet", summary: "Highlights", noSummary: "Noch keine offiziellen Highlights." },
-  tr: { live: "Şimdi canlı", soon: "Yakında", free: "Şifresiz", paid: "Şifreli", freeOnly: "Sadece şifresiz", matches: "Maçlar", none: "Rehberde spor etkinliği yok.", channels: "kanal", ended: "Bitti", summary: "Özet", noSummary: "Henüz resmi özet bulunamadı." },
+const COPY: Record<Lang, { live: string; soon: string; free: string; paid: string; freeOnly: string; matches: string; none: string; channels: string; ended: string; summary: string; noSummary: string; watchYt: string }> = {
+  fr: { live: "En direct", soon: "Prochainement", free: "En clair", paid: "Crypté", freeOnly: "En clair seulement", matches: "Matchs", none: "Aucun événement sportif trouvé dans le guide.", channels: "chaînes", ended: "Terminés", summary: "Résumé", noSummary: "Pas encore de résumé officiel trouvé.", watchYt: "Le diffuseur réserve ce résumé à YouTube — ouvrir la vidéo" },
+  en: { live: "Live now", soon: "Coming up", free: "Free-to-air", paid: "Encrypted", freeOnly: "Free-to-air only", matches: "Matches", none: "No sports events found in the guide.", channels: "channels", ended: "Finished", summary: "Highlights", noSummary: "No official highlights found yet.", watchYt: "The rights holder only allows this on YouTube — open the video" },
+  ar: { live: "مباشر الآن", soon: "قريبًا", free: "مفتوح", paid: "مشفر", freeOnly: "المفتوح فقط", matches: "مباريات", none: "لا توجد أحداث رياضية في الدليل.", channels: "قنوات", ended: "انتهت", summary: "الملخص", noSummary: "لم يتم العثور على ملخص رسمي بعد.", watchYt: "صاحب الحقوق يسمح بالمشاهدة على يوتيوب فقط — افتح الفيديو" },
+  es: { live: "En directo", soon: "Próximamente", free: "En abierto", paid: "Codificado", freeOnly: "Solo en abierto", matches: "Partidos", none: "No hay eventos deportivos en la guía.", channels: "canales", ended: "Finalizados", summary: "Resumen", noSummary: "Aún no hay resumen oficial.", watchYt: "El titular solo lo permite en YouTube — abrir el vídeo" },
+  pt: { live: "Ao vivo", soon: "Em breve", free: "Aberto", paid: "Codificado", freeOnly: "Só abertos", matches: "Jogos", none: "Nenhum evento esportivo no guia.", channels: "canais", ended: "Encerrados", summary: "Melhores momentos", noSummary: "Ainda sem resumo oficial.", watchYt: "O detentor só permite no YouTube — abrir o vídeo" },
+  de: { live: "Jetzt live", soon: "Demnächst", free: "Frei empfangbar", paid: "Verschlüsselt", freeOnly: "Nur frei", matches: "Spiele", none: "Keine Sportereignisse im Guide.", channels: "Sender", ended: "Beendet", summary: "Highlights", noSummary: "Noch keine offiziellen Highlights.", watchYt: "Nur auf YouTube erlaubt — Video öffnen" },
+  tr: { live: "Şimdi canlı", soon: "Yakında", free: "Şifresiz", paid: "Şifreli", freeOnly: "Sadece şifresiz", matches: "Maçlar", none: "Rehberde spor etkinliği yok.", channels: "kanal", ended: "Bitti", summary: "Özet", noSummary: "Henüz resmi özet bulunamadı.", watchYt: "Hak sahibi yalnızca YouTube’da izin veriyor — videoyu aç" },
 };
 
 const HL: Record<Lang, string> = {fr: "résumé", en: "highlights", ar: "ملخص", es: "resumen", pt: "melhores momentos", de: "highlights", tr: "özet"};
@@ -26,14 +26,14 @@ export function SportsView({ channels, guideOf, now, lang, onOpen, hasRem, toggl
   channels: Channel[]; guideOf: (c: Channel) => EpgChannel | undefined; now: number; lang: Lang; onOpen: (c: Channel) => void;
   hasRem: (k: string) => boolean; toggleRem: (r: Reminder) => void;
 }) {
-  const [player, setPlayer] = useState<{ title: string; v: Video | null; q: string; busy: boolean } | null>(null);
+  const [player, setPlayer] = useState<{ title: string; v: Video | null; embed: boolean; q: string; busy: boolean } | null>(null);
   const openSummary = async (e: Event) => {
     const title = e.p.title.replace(/^\s*(live|direct|en direct|directo|en vivo|ao vivo|canlı|مباشر)\s*[:\-–|]?\s*/i, "");
     const q = `https://www.youtube.com/results?search_query=${encodeURIComponent(`${title} ${HL[lang]}`)}`;
-    setPlayer({ title, v: null, q, busy: true });
+    setPlayer({ title, v: null, embed: false, q, busy: true });
     const m = parseMatch(e.p.title);
-    const v = m ? await highlightFor(m.home, m.away, e.p.start) : null;
-    setPlayer({ title, v, q, busy: false });
+    const r = m ? await highlightFor(m.home, m.away, e.p.start) : null;
+    setPlayer({ title, v: r?.v ?? null, embed: !!r?.embed, q, busy: false });
   };
   const [view, setView] = useState<"live" | "soon" | "ended">("live");
   const t = COPY[lang];
@@ -115,7 +115,12 @@ export function SportsView({ channels, guideOf, now, lang, onOpen, hasRem, toggl
             <div className="flex items-center justify-between gap-2"><h3 className="font-semibold">{player.title}</h3><button data-nav autoFocus onClick={() => setPlayer(null)} className="chip">✕</button></div>
             {player.busy ? <p className="py-10 text-center text-muted-foreground">…</p> : player.v ? (
               <>
-                <div className="aspect-video overflow-hidden rounded-lg bg-secondary"><iframe className="size-full" src={`https://www.youtube-nocookie.com/embed/${player.v.id}?autoplay=1`} title={player.v.title} allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen /></div>
+                {player.embed ? <div className="aspect-video overflow-hidden rounded-lg bg-secondary"><iframe className="size-full" src={`https://www.youtube-nocookie.com/embed/${player.v.id}?autoplay=1`} title={player.v.title} allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen /></div> : (
+                  <a data-nav href={`https://www.youtube.com/watch?v=${player.v.id}`} target="_blank" rel="noopener noreferrer" className="relative block aspect-video overflow-hidden rounded-lg bg-secondary">
+                    <img src={`https://i.ytimg.com/vi/${player.v.id}/hqdefault.jpg`} alt={player.v.title} className="size-full object-cover" />
+                    <span className="absolute inset-0 grid place-items-center bg-background/50 text-sm font-semibold">▶ {t.watchYt}</span>
+                  </a>
+                )}
                 <p className="text-xs text-muted-foreground">{player.v.channel} · {player.v.title}</p>
               </>
             ) : (

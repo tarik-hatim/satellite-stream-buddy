@@ -71,10 +71,9 @@ export function searchVideos(q: string): Promise<Video[]> {
 
 const embeddable = (id: string) => fetch(`/api/public/yt?embed=${id}`).then((r) => r.json() as Promise<{ ok: boolean }>).then((r) => r.ok).catch(() => false);
 
-/** Best official video that the owner allows to play inside the app. */
-export async function highlightFor(home: string, away: string, start: number): Promise<Video | null> {
-  for (const v of rankHighlights(home, away, start, await searchVideos(`${home} ${away}`)).slice(0, 5)) {
-    if (await embeddable(v.id)) return v;
-  }
-  return null;
+/** Best official video; prefers one the owner allows to play inside the app (embed=false → open that exact video on YouTube). */
+export async function highlightFor(home: string, away: string, start: number): Promise<{ v: Video; embed: boolean } | null> {
+  const ranked = rankHighlights(home, away, start, await searchVideos(`${home} ${away}`)).slice(0, 5);
+  for (const v of ranked) if (await embeddable(v.id)) return { v, embed: true };
+  return ranked[0] ? { v: ranked[0], embed: false } : null;
 }
