@@ -37,7 +37,8 @@ export function findHighlight(home: string, away: string, start: number, videos:
   let best: Video | null = null, bestScore = 0;
   for (const v of videos) {
     if (!v.verified || v.streamed || NOT_HL.test(fold(v.title))) continue;
-    if (v.ageMs > sinceKickoff + 6 * 3600_000) continue; // published before the match (old meeting of the same teams)
+    // Guide airings are often delayed re-broadcasts: accept videos up to 5 days before the airing, reject older meetings.
+    if (v.ageMs > sinceKickoff + 5 * 86_400_000) continue;
     if (v.dur && (v.dur < 45 || v.dur > 25 * 60)) continue; // shorts / full replays
     const words = tokens(v.title);
     const h = teamHit(home, words), a = teamHit(away, words);
