@@ -31,6 +31,12 @@ export const Route = createFileRoute("/api/public/yt")({
   server: {
     handlers: {
       GET: async ({ request }) => {
+        const embed = new URL(request.url).searchParams.get("embed");
+        if (embed) {
+          if (!/^[\w-]{11}$/.test(embed)) return new Response("Bad id", { status: 400 });
+          const o = await fetch(`https://www.youtube.com/oembed?format=json&url=https://www.youtube.com/watch?v=${embed}`);
+          return Response.json({ ok: o.ok }, { headers: { "cache-control": "public, max-age=86400" } });
+        }
         const q = (new URL(request.url).searchParams.get("q") ?? "").replace(/[^\p{L}\p{N}\s.'-]/gu, " ").replace(/\s+/g, " ").trim().slice(0, 100);
         if (q.length < 3) return new Response("Bad query", { status: 400 });
         const r = await fetch(`https://www.youtube.com/results?hl=en&gl=US&sp=EgIQAQ%253D%253D&search_query=${encodeURIComponent(q)}`, {

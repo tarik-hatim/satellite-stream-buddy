@@ -32,9 +32,14 @@ function teamHit(team: string, words: string[]): number {
 
 /** Best official video for a match, or null. `now` = time of the search (video ages are relative). */
 export function findHighlight(home: string, away: string, start: number, videos: Video[], now = Date.now()): Video | null {
+  return rankHighlights(home, away, start, videos, now)[0] ?? null;
+}
+
+/** All acceptable official videos, best first. */
+export function rankHighlights(home: string, away: string, start: number, videos: Video[], now = Date.now()): Video[] {
   const sinceKickoff = now - start;
   const homeT = tokens(home), awayT = tokens(away);
-  let best: Video | null = null, bestScore = 0;
+  const ranked: [number, Video][] = [];
   for (const v of videos) {
     if (!v.verified || v.streamed || NOT_HL.test(fold(v.title))) continue;
     // Guide airings are often delayed re-broadcasts: accept videos up to 5 days before the airing, reject older meetings.
@@ -49,9 +54,9 @@ export function findHighlight(home: string, away: string, start: number, videos:
     const club = [...homeT, ...awayT].some((w) => ch.includes(w));
     if (!official && !club) continue;
     const score = h + a + (league ? 3 : official ? 2 : 1.5) + (HL.test(fold(v.title)) ? 1 : 0) - v.ageMs / (7 * 86_400_000);
-    if (score > bestScore) { bestScore = score; best = v; }
+    ranked.push([score, v]);
   }
-  return best;
+  return ranked.sort((x, y) => y[0] - x[0]).map((x) => x[1]);
 }
 
 const memo = new Map<string, Promise<Video[]>>();
@@ -64,6 +69,12 @@ export function searchVideos(q: string): Promise<Video[]> {
   return memo.get(key)!;
 }
 
+const embeddable = (id: string) => fetch(`/api/public/yt?embed=${id}`).then((r) => r.json() as Promise<{ ok: boolean }>).then((r) => r.ok).catch(() => false);
+
+/** Best official video that the owner allows to play inside the app. */
 export async function highlightFor(home: string, away: string, start: number): Promise<Video | null> {
-  return findHighlight(home, away, start, await searchVideos(`${home} ${away}`));
+  for (const v of rankHighlights(home, away, start, await searchVideos(`${home} ${away}`)).slice(0, 5)) {
+    if (await embeddable(v.id)) return v;
+  }
+  return null;
 }
