@@ -1,7 +1,7 @@
 /** Multilingual match detection + cross-channel grouping for the Sport tab. */
 const PREFIX = /^\s*(?:live|en direct|direct|directo|en vivo|ao vivo|live:|canlı|مباشر|بث مباشر|القمة)\s*[:\-–|]?\s*/i;
 const SEP = /\s+(?:vs\.?|v\.?|versus|contre|gegen|contra|x|×|-|–|—|ضد|أمام|مع)\s+/i;
-const REPLAY = /\b(?:rediff\w*|replay|resume|highlights?|best of|magazine|repeticion|resumen|melhores momentos|tekrar|ozet|wiederholung|zusammenfassung|resumo|preview|avant-match|pre-?game|studio|sezon|season|analyse|talk|debrief|ozeti)\b|إعادة|ملخص/i;
+const REPLAY = /\b(?:rediff\w*|replay|resume|highlights?|best of|magazine|repeticion|resumen|melhores momentos|tekrar|ozet|wiederholung|zusammenfassung|classic match|classic|archive|retro|podcast|talk|doku|documentary|resumo|preview|avant-match|pre-?game|studio|sezon|season|analyse|talk|debrief|ozeti)\b|إعادة|ملخص/i;
 
 const norm = (s: string) =>
   s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
@@ -13,10 +13,13 @@ export interface MatchInfo { home: string; away: string }
 /** Returns the two teams if the title looks like a live match (not a replay/recap). */
 export function parseMatch(title: string): MatchInfo | null {
   if (isReplay(title)) return null;
-  const t = title.replace(PREFIX, "").split(/\s*[|:]\s*(?=[^|:]*$)/)[0]!; // drop trailing ": Ligue 1" etc. only if after teams
-  const parts = (SEP.test(t) ? t : title.replace(PREFIX, "")).split(SEP);
+  const clean = title.replace(PREFIX, "").replace(/\s+(?:hlts?|hls|highlights|live|en direct|directo)\s*$/i, "");
+  // Team names sit in the last ":" / "|" segment that contains a separator ("EFL 26/27: West Ham v QPR").
+  const segs = clean.split(/\s*[:|]\s*/).filter((x) => SEP.test(` ${x} `.replace(/^ | $/g, " ")) || SEP.test(x));
+  const seg = (segs.length ? segs[segs.length - 1]! : clean).replace(/^.*?\bmecz\b\s*/i, "");
+  const parts = seg.split(SEP);
   if (parts.length !== 2) return null;
-  const [home, away] = parts.map((p) => norm(p.replace(/^.*[:|]\s*/, "")));
+  const [home, away] = parts.map(norm);
   if (!home || !away || home.length > 40 || away.length > 40) return null;
   return { home, away };
 }
